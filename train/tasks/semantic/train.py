@@ -13,6 +13,7 @@ from pip._vendor.distlib.compat import raw_input
 
 from tasks.semantic.modules.SalsaNextAdf import *
 from tasks.semantic.modules.SalsaNext import *
+from tasks.semantic.modules.SalsaNextDA import * 
 #from tasks.semantic.modules.save_dataset_projected import *
 import math
 from decimal import Decimal
@@ -90,11 +91,27 @@ if __name__ == '__main__':
         const=True, default=False,
         help='Set this if you want to use the Uncertainty Version'
     )
+    parser.add_argument(
+        '--domain_adaptation', '-da',
+        type=str2bool, nargs='?',
+        const=True, default=False,
+        help='Set this if you want to use the unsupervised domain adaptation Version'
+    )
+
+    parser.add_argument(
+        '--testset', '-d',
+        type=str,
+        required=True,
+        help='Unlabelled dataset. No default',
+    )
 
     FLAGS, unparsed = parser.parse_known_args()
     FLAGS.log = FLAGS.log + '/logs/' + datetime.datetime.now().strftime("%Y-%-m-%d-%H:%M") + FLAGS.name
     if FLAGS.uncertainty:
         params = SalsaNextUncertainty(20)
+        pytorch_total_params = sum(p.numel() for p in params.parameters() if p.requires_grad)
+    elif FLAGS.domain_adaptation: 
+        params = SalsaNextDA(20)
         pytorch_total_params = sum(p.numel() for p in params.parameters() if p.requires_grad)
     else:
         params = SalsaNext(20)
@@ -103,9 +120,11 @@ if __name__ == '__main__':
     print("----------")
     print("INTERFACE:")
     print("dataset", FLAGS.dataset)
+    print("trainset", FLAGS.testset)
     print("arch_cfg", FLAGS.arch_cfg)
     print("data_cfg", FLAGS.data_cfg)
     print("uncertainty", FLAGS.uncertainty)
+    print("domain_adaption", FLAGS.domain_adaption)
     print("Total of Trainable Parameters: {}".format(millify(pytorch_total_params,2)))
     print("log", FLAGS.log)
     print("pretrained", FLAGS.pretrained)
@@ -173,5 +192,5 @@ if __name__ == '__main__':
         quit()
 
     # create trainer and start the training
-    trainer = Trainer(ARCH, DATA, FLAGS.dataset, FLAGS.log, FLAGS.pretrained,FLAGS.uncertainty)
+    trainer = Trainer(ARCH, DATA, FLAGS.dataset, FLAGS.log, FLAGS.testset, FLAGS.pretrained,FLAGS.uncertainty, FLAGS.domain_adaptation)
     trainer.train()
