@@ -99,7 +99,7 @@ if __name__ == '__main__':
     )
 
     parser.add_argument(
-        '--testset', '-d',
+        '--testset', '-td',
         type=str,
         required=True,
         help='Unlabelled dataset. No default',

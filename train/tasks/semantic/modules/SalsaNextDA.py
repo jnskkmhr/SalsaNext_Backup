@@ -38,13 +38,13 @@ class ResContextBlock(nn.Module):
         output = shortcut + resA2
         return output
 
-# Gated Adaptor of https://arxiv.org/abs/2107.09783
+# Gated Adaptor(https://arxiv.org/abs/2107.09783)
 class GatedAdaptor(nn.Module): 
     def __init__(self, in_filters, kernel_size=(1, 1), stride=1): 
         super(GatedAdaptor, self).__init__()
         
         self.conv1 = nn.Conv2d(in_filters, in_filters, kernel_size=kernel_size, stride=stride)
-        self.gamma = nn.parameter(torch.zeros((1)), requires_grad=True)
+        self.gamma = nn.parameter.Parameter(torch.zeros((1)), requires_grad=True)
 
     def forward(self, x): 
         shortcut = self.conv1(x) * self.gamma 
@@ -91,31 +91,31 @@ class ResBlock(nn.Module):
         else:
             self.dropout = nn.Dropout2d(p=dropout_rate)
 
-    def forward(self, x):
+    def forward(self, x, DA):
         shortcut = self.conv1(x)
         shortcut = self.act1(shortcut)
 
         resA = self.conv2(x)
-        if self.DA: 
+        if DA: 
             resA = self.ga1(resA)
         resA = self.act2(resA)
         resA1 = self.bn1(resA)
 
         resA = self.conv3(resA1)
-        if self.DA: 
+        if DA: 
             resA = self.ga2(resA)
         resA = self.act3(resA)
         resA2 = self.bn2(resA)
 
         resA = self.conv4(resA2)
-        if self.DA: 
+        if DA: 
             resA = self.ga3(resA)
         resA = self.act4(resA)
         resA3 = self.bn3(resA)
 
         concat = torch.cat((resA1,resA2,resA3),dim=1)
         resA = self.conv5(concat)
-        if self.DA: 
+        if DA: 
             resA = self.ga4(resA)
         resA = self.act5(resA)
         resA = self.bn4(resA)
@@ -235,11 +235,11 @@ class SalsaNextDA(nn.Module):
         downCntx = self.downCntx2(downCntx)
         downCntx = self.downCntx3(downCntx)
 
-        down0c, down0b = self.resBlock1(downCntx)
-        down1c, down1b = self.resBlock2(down0c)
-        down2c, down2b = self.resBlock3(down1c)
-        down3c, down3b = self.resBlock4(down2c)
-        down5c = self.resBlock5(down3c)
+        down0c, down0b = self.resBlock1(downCntx, self.DA)
+        down1c, down1b = self.resBlock2(down0c, self.DA)
+        down2c, down2b = self.resBlock3(down1c, self.DA)
+        down3c, down3b = self.resBlock4(down2c, self.DA)
+        down5c = self.resBlock5(down3c, self.DA)
 
         up4e = self.upBlock1(down5c,down3b)
         up3e = self.upBlock2(up4e, down2b)
