@@ -68,7 +68,7 @@ class SemanticKitti(Dataset):
                learning_map,  # classes to learn (0 to N-1 for xentropy)
                learning_map_inv,    # inverse of previous (recover labels)
                sensor,              # sensor to parse scans from
-               max_points=150000,   # max number of points present in dataset
+               max_points=450000,   # max number of points present in dataset
                gt=True,
                transform=False):            # send ground truth?
     # save deats
