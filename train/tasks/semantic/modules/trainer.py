@@ -5,7 +5,7 @@ import os
 import time
 import imp
 import copy 
-import random
+import random.randint as randint 
 
 from torch import random
 import cv2
@@ -389,7 +389,7 @@ class Trainer():
     def crop_target(self, x): 
         #assume x as a minibatch of test loader 
         _, h, w, _ = x.size()
-        idx = [random.randint(0, 1) for _ in range(w)]
+        idx = [randint(0, 1) for _ in range(w)]
         idx = [i for i, a in enumerate(idx) if a==1]
         x_aux = copy.deepcopy(x)
         x_aux[:, :, idx, :] = 0 
