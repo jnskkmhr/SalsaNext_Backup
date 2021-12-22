@@ -66,7 +66,7 @@ def save_checkpoint(to_save, logdir, suffix=""):
 
 
 class Trainer():
-    def __init__(self, ARCH, DATA, datadir, logdir, testdir, path=None,uncertainty=False, DA=False):
+    def __init__(self, ARCH, DATA, datadir, logdir, testdir, path=None,uncertainty=False, DA=True):
         # parameters
         self.ARCH = ARCH
         self.DATA = DATA
@@ -144,13 +144,13 @@ class Trainer():
         print("Loss weights from content: ", self.loss_w.data)
 
         with torch.no_grad():
-            if not self.uncertainty:
+            if not self.uncertainty and not self.DA:
                 self.model = SalsaNext(self.parser.get_n_classes())
 
             elif self.DA: 
                 self.model = SalsaNextDA(self.parser.get_n_classes())
 
-            else:
+            elif self.uncertainty:
                 self.model = SalsaNextUncertainty(self.parser.get_n_classes())
 
         self.tb_logger = Logger(self.log + "/tb")
