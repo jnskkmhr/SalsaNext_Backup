@@ -633,7 +633,7 @@ class Trainer():
         model.eval()
         _, comp_s = model(in_vol)
         masks_inv_s = 1 - proj_mask
-        in_vol[masks_inv_s] = comp_s[masks_inv_s]
+        in_vol[:, masks_inv_s==1] = comp_s[:, masks_inv_s==1]
         
         #mask transfer from target to source 
         proj_mask_t = proj_mask_t + mask_aux
