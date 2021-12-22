@@ -564,8 +564,9 @@ class Trainer():
         if self.gpu:
             torch.cuda.empty_cache()
         
-        for i, (in_vol, proj_in), (proj_mask, proj_mask_t), (proj_labels, _), (_, _), (path_seq, _), (path_name, _), (_, p_x), (_, p_y), (_, p_z), (_, proj_range), (_, unprojrange), (_, _), (_, _), (_, _), (_, npoints) in enumerate(zip(train_loader, test_loader)):
-
+        for i, (source_item, target_item) in enumerate(zip(train_loader, test_loader)):
+            in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _ = source_item 
+            proj_in, proj_mask_t, _, _, _, _, p_x, p_y, p_z, proj_range, unprojrange, _, _, _, npoints = target_item
             # unsupervised learning (method1)
             p_x = p_x[0, :npoints]
             p_y = p_y[0, :npoints]
