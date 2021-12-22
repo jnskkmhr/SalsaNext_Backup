@@ -92,9 +92,9 @@ if __name__ == '__main__':
         help='Set this if you want to use the Uncertainty Version'
     )
     parser.add_argument(
-        '--domain_adaptation', '-da',
+        '--dadaptation', '-da',
         type=str2bool, nargs='?',
-        const=True, default=False,
+        const=True, default=True,
         help='Set this if you want to use the unsupervised domain adaptation Version'
     )
 
@@ -110,7 +110,7 @@ if __name__ == '__main__':
     if FLAGS.uncertainty:
         params = SalsaNextUncertainty(20)
         pytorch_total_params = sum(p.numel() for p in params.parameters() if p.requires_grad)
-    elif FLAGS.domain_adaptation: 
+    elif FLAGS.dadaptation: 
         params = SalsaNextDA(20)
         pytorch_total_params = sum(p.numel() for p in params.parameters() if p.requires_grad)
     else:
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     print("arch_cfg", FLAGS.arch_cfg)
     print("data_cfg", FLAGS.data_cfg)
     print("uncertainty", FLAGS.uncertainty)
-    print("domain_adaption", FLAGS.domain_adaption)
+    print("domain_adaption", FLAGS.dadaption)
     print("Total of Trainable Parameters: {}".format(millify(pytorch_total_params,2)))
     print("log", FLAGS.log)
     print("pretrained", FLAGS.pretrained)
@@ -192,5 +192,5 @@ if __name__ == '__main__':
         quit()
 
     # create trainer and start the training
-    trainer = Trainer(ARCH, DATA, FLAGS.dataset, FLAGS.log, FLAGS.testset, FLAGS.pretrained,FLAGS.uncertainty, FLAGS.domain_adaptation)
+    trainer = Trainer(ARCH, DATA, FLAGS.dataset, FLAGS.log, FLAGS.testset, FLAGS.pretrained,FLAGS.uncertainty, FLAGS.dadaptation)
     trainer.train()
