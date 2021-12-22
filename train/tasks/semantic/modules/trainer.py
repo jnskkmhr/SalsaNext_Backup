@@ -566,8 +566,10 @@ class Trainer():
         
         for i, (source_item, target_item) in enumerate(zip(train_loader, test_loader)):
             in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _ = source_item 
-            proj_in, proj_mask_t, _, _, _, _, p_x, p_y, p_z, proj_range, unprojrange, _, _, _, npoints = target_item
+            proj_in, proj_mask_t, _, _, _, _, p_x, p_y, p_z, proj_range, unproj_range, _, _, _, npoints = target_item
+            ################################
             # unsupervised learning (method1)
+            ################################
             p_x = p_x[0, :npoints]
             p_y = p_y[0, :npoints]
             proj_range = proj_range[0, :npoints]
@@ -606,7 +608,9 @@ class Trainer():
         if self.gpu:
             proj_labels = proj_labels.cuda().long()
 
-        # source image densification (method2) 
+        #####################################
+        #source image densification (method2) 
+        #####################################
         model.eval()
         _, comp_s = model(in_vol)
         masks_inv_s = 1 - proj_mask
@@ -618,7 +622,9 @@ class Trainer():
         proj_labels = proj_labels * proj_mask
         in_vol = in_vol * proj_mask_t 
 
+        ##############################
         # supervised learning (method3)
+        ##############################
         model.train()
         model.DA = False
         # compute output
