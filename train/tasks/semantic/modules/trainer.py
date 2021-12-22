@@ -567,6 +567,21 @@ class Trainer():
         for i, (in_vol, proj_in), (proj_mask, proj_mask_t), (proj_labels, _), (_, _), (path_seq, _), (path_name, _), (_, p_x), (_, p_y), (_, p_z), (_, proj_range), (_, unprojrange), (_, _), (_, _), (_, _), (_, npoints) in enumerate(zip(train_loader, test_loader)):
 
             # unsupervised learning (method1)
+            p_x = p_x[0, :npoints]
+            p_y = p_y[0, :npoints]
+            proj_range = proj_range[0, :npoints]
+            unproj_range = unproj_range[0, :npoints]
+            path_seq = path_seq[0]
+            path_name = path_name[0]
+
+            if self.gpu:
+                proj_in = proj_in.cuda()
+                p_x = p_x.cuda()
+                p_y = p_y.cuda()
+            if self.post:
+                proj_range = proj_range.cuda()
+                unproj_range = unproj_range.cuda()
+
             model.DA = True
             proj_in, image_aux = self.crop_target(proj_in)
             proj_mask_t, mask_aux = self.crop_target(proj_mask_t)
