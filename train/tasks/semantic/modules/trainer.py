@@ -386,15 +386,23 @@ class Trainer():
 
         return
 
-    def crop_target(self, x): 
+    def crop_target_image(self, x): 
         #assume x as a minibatch of test loader 
-        print(x.size())
         _, _, h, w = x.size()
         idx = [randint(0, 1) for _ in range(w)]
         idx = [i for i, a in enumerate(idx) if a==1]
         x_aux = copy.deepcopy(x)
         x_aux[:, :, :, idx] = 0 
         return x-x_aux, x_aux 
+
+    def crop_target_mask(self, x): 
+        #assume x as a minibatch of test loader 
+        _, h, w = x.size()
+        idx = [randint(0, 1) for _ in range(w)]
+        idx = [i for i, a in enumerate(idx) if a==1]
+        x_aux = copy.deepcopy(x)
+        x_aux[:, :, idx] = 0 
+        return x-x_aux, x_aux
 
     def train_epoch(self, train_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10,
                     show_scans=False):
@@ -587,8 +595,8 @@ class Trainer():
             #     unproj_range = unproj_range.cuda()
 
             model.DA = True
-            proj_in, image_aux = self.crop_target(proj_in)
-            proj_mask_t, mask_aux = self.crop_target(proj_mask_t)
+            proj_in, image_aux = self.crop_target_image(proj_in)
+            proj_mask_t, mask_aux = self.crop_target_mask(proj_mask_t)
 
             if not self.multi_gpu and self.gpu:
                 in_vol = in_vol.cuda()
