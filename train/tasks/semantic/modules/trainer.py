@@ -393,7 +393,7 @@ class Trainer():
         idx = [randint(0, 1) for _ in range(w)]
         idx = [i for i, a in enumerate(idx) if a==1]
         x_aux = copy.deepcopy(x)
-        x_aux[:, :, idx, :] = 0 
+        x_aux[:, :, :, idx] = 0 
         return x-x_aux, x_aux 
 
     def train_epoch(self, train_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10,
