@@ -10,7 +10,7 @@ helpFunction()
    exit 1
 }
 
-while getopts "d:a:l:n:c:p:u:" opt
+while getopts "d:a:l:n:c:p:u:t:y" opt
 do
    case "$opt" in
       d ) d="$OPTARG" ;;
@@ -20,21 +20,26 @@ do
       c ) c="$OPTARG" ;;
       p ) p="$OPTARG" ;;
       u ) u="$OPTARG" ;;
+      t ) t="$OPTARG" ;; 
+      y ) y="$OPTARG" ;; 
       ? ) helpFunction ;;
    esac
 done
 
-if [ -z "$a" ] || [ -z "$d" ] || [ -z "$l" ]
+if [ -z "$a" ] || [ -z "$d" ] || [ -z "$l" ] || [ -z "$t"]
 then
    echo "Some or all of the parameters are empty";
    helpFunction
 fi
-if [ -z "$u" ]
-then u='false'
+if [ -z "$u" ] || [ -z "$y"]
+then 
+u='false'
+y='true'
 fi
 d=$(get_abs_filename "$d")
 a=$(get_abs_filename "$a")
 l=$(get_abs_filename "$l")
+t=$(get_abs_filename "$t")
 if [ -z "$p" ]
 then
  p=""
@@ -42,4 +47,4 @@ else
   p=$(get_abs_filename "$p")
 fi
 export CUDA_VISIBLE_DEVICES="$c"
-cd ./train/tasks/semantic;  ./train.py -d "$d"  -ac "$a" -l "$l" -n "$n" -p "$p" -u "$u"
+cd ./train/tasks/semantic;  ./train.py -d "$d"  -ac "$a" -l "$l" -n "$n" -p "$p" -u "$u" -td "$t" -da "$y"
