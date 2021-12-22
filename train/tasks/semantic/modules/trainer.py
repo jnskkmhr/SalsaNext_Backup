@@ -5,7 +5,7 @@ import os
 import time
 import imp
 import copy 
-import random.randint as randint 
+from random import randint 
 
 from torch import random
 import cv2
