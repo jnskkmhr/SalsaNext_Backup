@@ -570,24 +570,34 @@ class Trainer():
             ################################
             # unsupervised learning (method1)
             ################################
-            p_x = p_x[0, :npoints]
-            p_y = p_y[0, :npoints]
-            proj_range = proj_range[0, :npoints]
-            unproj_range = unproj_range[0, :npoints]
-            path_seq = path_seq[0]
-            path_name = path_name[0]
+            # p_x = p_x[0, :npoints]
+            # p_y = p_y[0, :npoints]
+            # proj_range = proj_range[0, :npoints]
+            # unproj_range = unproj_range[0, :npoints]
+            # path_seq = path_seq[0]
+            # path_name = path_name[0]
 
-            if self.gpu:
-                proj_in = proj_in.cuda()
-                p_x = p_x.cuda()
-                p_y = p_y.cuda()
-            if self.post:
-                proj_range = proj_range.cuda()
-                unproj_range = unproj_range.cuda()
+            # if self.gpu:
+            #     proj_in = proj_in.cuda()
+            #     p_x = p_x.cuda()
+            #     p_y = p_y.cuda()
+            # if self.post:
+            #     proj_range = proj_range.cuda()
+            #     unproj_range = unproj_range.cuda()
 
             model.DA = True
             proj_in, image_aux = self.crop_target(proj_in)
             proj_mask_t, mask_aux = self.crop_target(proj_mask_t)
+
+            if not self.multi_gpu and self.gpu:
+                in_vol = in_vol.cuda()
+                proj_mask = proj_mask.cuda()
+                proj_in = proj_in.cuda()
+                proj_mask_t = proj_mask_t.cuda()
+
+            if self.gpu: 
+                proj_labels = proj_labels.cuda().long()
+                
             _, reconst = model(image_aux)
             loss_m = beta * self.AuxiliaryLoss(proj_in, reconst)
 
