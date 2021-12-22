@@ -124,7 +124,7 @@ if __name__ == '__main__':
     print("arch_cfg", FLAGS.arch_cfg)
     print("data_cfg", FLAGS.data_cfg)
     print("uncertainty", FLAGS.uncertainty)
-    print("domain_adaption", FLAGS.dadaption)
+    print("domain_adaption", FLAGS.dadaptation)
     print("Total of Trainable Parameters: {}".format(millify(pytorch_total_params,2)))
     print("log", FLAGS.log)
     print("pretrained", FLAGS.pretrained)
