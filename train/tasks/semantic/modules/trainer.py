@@ -630,10 +630,14 @@ class Trainer():
         #####################################
         #source image densification (method2) 
         #####################################
+        #mask_inv_s : [B, W, H]
+        #in_vol, comp_s : [B, C, W, H]
         model.eval()
         _, comp_s = model(in_vol)
         masks_inv_s = 1 - proj_mask
+        in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3)
         in_vol[:, masks_inv_s==1] = comp_s[:, masks_inv_s==1]
+        in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3)
         
         #mask transfer from target to source 
         proj_mask_t = proj_mask_t + mask_aux
