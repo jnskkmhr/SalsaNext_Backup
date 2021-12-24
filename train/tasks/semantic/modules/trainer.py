@@ -573,9 +573,13 @@ class Trainer():
         if self.gpu:
             torch.cuda.empty_cache()
         
+        end = time.time()
         for i, (source_item, target_item) in enumerate(zip(train_loader, test_loader)):
             in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _ = source_item 
             proj_in, proj_mask_t, _, _, _, _, p_x, p_y, p_z, proj_range, unproj_range, _, _, _, npoints = target_item
+
+            # measure data loading time
+            self.data_time_t.update(time.time() - end)
             ################################
             # unsupervised learning (method1)
             ################################
@@ -600,9 +604,11 @@ class Trainer():
 
             if not self.multi_gpu and self.gpu:
                 in_vol = in_vol.cuda()
-                proj_mask = proj_mask.cuda()
+                # proj_mask = proj_mask.cuda()
                 proj_in = proj_in.cuda()
-                proj_mask_t = proj_mask_t.cuda()
+                image_aux = image_aux.cuda()
+                # proj_mask_t = proj_mask_t.cuda()
+                # mask_aux = mask_aux.cuda()
 
             if self.gpu: 
                 proj_labels = proj_labels.cuda().long()
@@ -618,14 +624,6 @@ class Trainer():
                 loss_m.backward()
             optimizer.step()
  
-        end = time.time()
-        # measure data loading time
-        self.data_time_t.update(time.time() - end)
-        if not self.multi_gpu and self.gpu:
-            in_vol = in_vol.cuda()
-            #proj_mask = proj_mask.cuda()
-        if self.gpu:
-            proj_labels = proj_labels.cuda().long()
 
         #####################################
         #source image densification (method2) 
@@ -636,12 +634,14 @@ class Trainer():
         _, comp_s = model(in_vol)
         masks_inv_s = 1 - proj_mask
         in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3)
-        in_vol[:, masks_inv_s==1] = comp_s[:, masks_inv_s==1]
+        in_vol[:, masks_inv_s==1] = comp_s[:, masks_inv_s==1] #errorが出る
         in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3)
         
         #mask transfer from target to source 
         proj_mask_t = proj_mask_t + mask_aux
         proj_mask = proj_mask * proj_mask_t
+        proj_mask = proj_mask.cuda()
+        proj_mask_t = proj_mask_t.cuda()
         proj_labels = proj_labels * proj_mask
         in_vol = in_vol * proj_mask_t 
 
