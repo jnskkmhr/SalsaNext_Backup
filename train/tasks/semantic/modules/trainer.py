@@ -648,8 +648,8 @@ class Trainer():
         #mask transfer from target to source 
         proj_mask_t = proj_mask_t + mask_aux
         proj_mask = proj_mask * proj_mask_t
-        proj_mask = proj_mask.cuda()
-        proj_mask_t = proj_mask_t.cuda()
+        proj_mask = proj_mask.cuda().long()
+        proj_mask_t = proj_mask_t.cuda().long()
         proj_labels = proj_labels * proj_mask
         in_vol = in_vol * proj_mask_t 
 
