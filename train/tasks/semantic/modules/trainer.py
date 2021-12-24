@@ -649,7 +649,7 @@ class Trainer():
         proj_mask_t = proj_mask_t + mask_aux
         proj_mask = proj_mask * proj_mask_t
         proj_mask = proj_mask.cuda().long()
-        proj_mask_t = proj_mask_t.cuda().long()
+        proj_mask_t = proj_mask_t.cuda()
         proj_labels = proj_labels * proj_mask
         in_vol = in_vol * proj_mask_t.unsqueeze(1) 
 
