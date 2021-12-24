@@ -602,13 +602,18 @@ class Trainer():
             proj_in, image_aux = self.crop_target_image(proj_in)
             proj_mask_t, mask_aux = self.crop_target_mask(proj_mask_t)
 
-            if not self.multi_gpu and self.gpu:
+            # if not self.multi_gpu and self.gpu:
+            #     in_vol = in_vol.cuda()
+            #     # proj_mask = proj_mask.cuda()
+            #     proj_in = proj_in.cuda()
+            #     image_aux = image_aux.cuda()
+            #     # proj_mask_t = proj_mask_t.cuda()
+            #     # mask_aux = mask_aux.cuda()
+
+            if self.multi_gpu or self.gpu: 
                 in_vol = in_vol.cuda()
-                # proj_mask = proj_mask.cuda()
                 proj_in = proj_in.cuda()
                 image_aux = image_aux.cuda()
-                # proj_mask_t = proj_mask_t.cuda()
-                # mask_aux = mask_aux.cuda()
 
             if self.gpu: 
                 proj_labels = proj_labels.cuda().long()
@@ -634,7 +639,10 @@ class Trainer():
         _, comp_s = model(in_vol)
         masks_inv_s = 1 - proj_mask
         in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3)
-        in_vol[:, masks_inv_s==1] = comp_s[:, masks_inv_s==1] #errorが出る
+        if self.multi_gpu or self.gpu: 
+            in_vol = in_vol.cuda()
+            comp_s = comp_s.cuda()
+        in_vol[:, masks_inv_s==1] = comp_s[:, masks_inv_s==1] #errorが出るところ
         in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3)
         
         #mask transfer from target to source 
