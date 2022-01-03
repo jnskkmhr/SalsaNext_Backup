@@ -6,7 +6,6 @@ import time
 import imp
 import copy 
 from random import randint 
-from tqdm import tqdm 
 
 from torch import random
 import cv2
@@ -576,7 +575,8 @@ class Trainer():
             torch.cuda.empty_cache()
         
         end = time.time()
-        for i, (source_item, target_item) in tqdm(enumerate(zip(train_loader, test_loader))):
+        for i, (source_item, target_item) in enumerate(zip(train_loader, test_loader)):
+            print("batch iteration {}".format(i))
             in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _ = source_item 
             proj_in, proj_mask_t, _, _, _, _, p_x, p_y, p_z, proj_range, unproj_range, _, _, _, npoints = target_item
 
@@ -814,7 +814,8 @@ class Trainer():
 
         with torch.no_grad():
             end = time.time()
-            for i, (in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _) in tqcm(enumerate(val_loader)):
+            for i, (in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _) in enumerate(val_loader):
+                print("batch iteration {}".format(i))
                 if not self.multi_gpu and self.gpu:
                     in_vol = in_vol.cuda()
                     proj_mask = proj_mask.cuda()
