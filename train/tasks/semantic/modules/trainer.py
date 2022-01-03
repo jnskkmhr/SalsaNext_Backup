@@ -618,6 +618,10 @@ class Trainer():
 
             if self.gpu: 
                 proj_labels = proj_labels.cuda().long()
+            
+            print("in_vol device: ", in_vol.device)
+            print("proj_in device: ", proj_in.device)
+            print("image_aux device", image_aux.device)
                 
             _, reconst = model(image_aux)
             loss_aux = beta * self.AuxiliaryLoss(proj_in, reconst)
@@ -640,9 +644,7 @@ class Trainer():
         _, comp_s = model(in_vol)
         masks_inv_s = 1 - proj_mask
         in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3)
-        if not self.multi_gpu and self.gpu: 
-            in_vol = in_vol.cuda()
-            comp_s = comp_s.cuda()
+        in_vol = in_vol.cuda()
         print("comp_s device: ", comp_s.device)
         print("in_vol device: ", in_vol.device)
         print("mask_inv_s device", masks_inv_s.device)
