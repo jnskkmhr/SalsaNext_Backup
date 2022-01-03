@@ -328,6 +328,7 @@ class Trainer():
                      'scheduler': self.scheduler.state_dict()
                      }
             save_checkpoint(state, self.log, suffix="")
+            print("Saved checkpoint") #get a log when saving model 
 
             if self.info['train_iou'] > self.info['best_train_iou']:
                 print("Best mean iou in training set so far, save model!")
@@ -610,7 +611,7 @@ class Trainer():
             #     # proj_mask_t = proj_mask_t.cuda()
             #     # mask_aux = mask_aux.cuda()
 
-            if self.multi_gpu or self.gpu: 
+            if not self.multi_gpu and self.gpu: 
                 in_vol = in_vol.cuda()
                 proj_in = proj_in.cuda()
                 image_aux = image_aux.cuda()
@@ -619,14 +620,14 @@ class Trainer():
                 proj_labels = proj_labels.cuda().long()
                 
             _, reconst = model(image_aux)
-            loss_m = beta * self.AuxiliaryLoss(proj_in, reconst)
+            loss_aux = beta * self.AuxiliaryLoss(proj_in, reconst)
 
             optimizer.zero_grad()
             if self.n_gpus > 1:
                 idx = torch.ones(self.n_gpus).cuda()
-                loss_m.backward(idx)
+                loss_aux.backward(idx)
             else:
-                loss_m.backward()
+                loss_aux.backward()
             optimizer.step()
  
 
@@ -639,10 +640,10 @@ class Trainer():
         _, comp_s = model(in_vol)
         masks_inv_s = 1 - proj_mask
         in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3)
-        if self.multi_gpu or self.gpu: 
+        if not self.multi_gpu and self.gpu: 
             in_vol = in_vol.cuda()
             comp_s = comp_s.cuda()
-        in_vol[:, masks_inv_s==1] = comp_s[:, masks_inv_s==1] #errorが出るところ
+        in_vol[:, masks_inv_s==1] = comp_s[:, masks_inv_s==1] 
         in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3)
         
         #mask transfer from target to source 
@@ -680,7 +681,7 @@ class Trainer():
         optimizer.step()
 
         # measure accuracy and record loss
-        loss = loss_m.mean()
+        loss = (loss_m + loss_aux).mean()
         with torch.no_grad():
             evaluator.reset()
             argmax = output.argmax(dim=1)
