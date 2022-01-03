@@ -643,7 +643,10 @@ class Trainer():
         if not self.multi_gpu and self.gpu: 
             in_vol = in_vol.cuda()
             comp_s = comp_s.cuda()
-        in_vol[:, masks_inv_s==1] = comp_s[:, masks_inv_s==1] 
+        print("comp_s device: ", comp_s.device)
+        print("in_vol device: ", in_vol.device)
+        print("mask_inv_s device", masks_inv_s.device)
+        in_vol[:, masks_inv_s==1] = comp_s[:, masks_inv_s==1] #error
         in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3)
         
         #mask transfer from target to source 
