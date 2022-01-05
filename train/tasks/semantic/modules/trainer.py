@@ -256,7 +256,7 @@ class Trainer():
 
         # train for n epochs
         for epoch in range(self.epoch, self.ARCH["train"]["max_epochs"]):
-
+            print("Epoch {}/{}".format(epoch+1, self.ARCH["train"]["max_epochs"]))
             # train for 1 epoch
             acc, iou, loss, update_mean,hetero_l = self.train_epoch(train_loader=self.parser.get_train_set(),
                                                            model=self.model,
