@@ -601,6 +601,28 @@ class Trainer():
             #     unproj_range = unproj_range.cuda()
 
             model.DA = True
+
+            ## unfreeze UDA specific layer
+            for param in model.upBlock_aux1.parameters(): 
+                param.requires_grad = True 
+            for param in model.upBlock_aux2.parameters(): 
+                param.requires_grad = True
+            for param in model.upBlock_aux3.parameters(): 
+                param.requires_grad = True 
+            for param in model.upBlock_aux4.parameters(): 
+                param.requires_grad = True
+            for param in model.logits_aux.parameters(): 
+                param.requires_grad = True
+            for block in [model.resBlock1, model.resBlock2, model.resBlock3, model.resBlock4, model.resBlock5]: 
+                block.ga1.conv1.weight.requires_grad = True
+                block.ga1.conv1.bias.requires_grad = True 
+                block.ga2.conv1.weight.requires_grad = True
+                block.ga2.conv1.bias.requires_grad = True
+                block.ga3.conv1.weight.requires_grad = True
+                block.ga3.conv1.bias.requires_grad = True
+                block.ga4.conv1.weight.requires_grad = True
+                block.ga4.conv1.bias.requires_grad = True
+
             proj_in, image_aux = self.crop_target_image(proj_in)
             proj_mask_t, mask_aux = self.crop_target_mask(proj_mask_t)
 
@@ -641,6 +663,28 @@ class Trainer():
             #mask_inv_s : [B, W, H]
             #in_vol, comp_s : [B, C, W, H]
             model.eval()
+
+            ## freeze UDA specific layer
+            for param in model.upBlock_aux1.parameters(): 
+                param.requires_grad = False 
+            for param in model.upBlock_aux2.parameters(): 
+                param.requires_grad = False
+            for param in model.upBlock_aux3.parameters(): 
+                param.requires_grad = False 
+            for param in model.upBlock_aux4.parameters(): 
+                param.requires_grad = False
+            for param in model.logits_aux.parameters(): 
+                param.requires_grad = False
+            for block in [model.resBlock1, model.resBlock2, model.resBlock3, model.resBlock4, model.resBlock5]: 
+                block.ga1.conv1.weight.requires_grad = False
+                block.ga1.conv1.bias.requires_grad = False 
+                block.ga2.conv1.weight.requires_grad = False
+                block.ga2.conv1.bias.requires_grad = False
+                block.ga3.conv1.weight.requires_grad = False
+                block.ga3.conv1.bias.requires_grad = False
+                block.ga4.conv1.weight.requires_grad = False
+                block.ga4.conv1.bias.requires_grad = False
+
             _, comp_s = model(in_vol)
             comp_s = comp_s.cpu()
             masks_inv_s = 1 - proj_mask
