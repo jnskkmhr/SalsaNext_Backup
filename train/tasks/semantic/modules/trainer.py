@@ -612,15 +612,13 @@ class Trainer():
             #     # proj_mask_t = proj_mask_t.cuda()
             #     # mask_aux = mask_aux.cuda()
 
-            if not self.multi_gpu and self.gpu: 
-                in_vol = in_vol.cuda()
-                proj_in = proj_in.cuda()
-                image_aux = image_aux.cuda()
+            # if not self.multi_gpu and self.gpu: 
+            #     proj_in = proj_in.cuda()
+            #     image_aux = image_aux.cuda()
 
-            if self.gpu: 
-                proj_labels = proj_labels.cuda().long()
+            # if self.gpu: 
+            #     proj_labels = proj_labels.cuda().long()
             
-            print("in_vol device: ", in_vol.device)
             print("proj_in device: ", proj_in.device)
             print("image_aux device", image_aux.device)
                 
@@ -634,6 +632,7 @@ class Trainer():
             else:
                 loss_aux.backward()
             optimizer.step()
+            loss_aux  = loss_aux.cpu()
  
 
             #####################################
@@ -643,20 +642,21 @@ class Trainer():
             #in_vol, comp_s : [B, C, W, H]
             model.eval()
             _, comp_s = model(in_vol)
+            comp_s = comp_s.cpu()
             masks_inv_s = 1 - proj_mask
             in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3)
-            in_vol = in_vol.cuda()
+            # in_vol = in_vol.cuda()
             print("comp_s device: ", comp_s.device)
             print("in_vol device: ", in_vol.device)
             print("mask_inv_s device", masks_inv_s.device)
-            in_vol[:, masks_inv_s==1] = comp_s[:, masks_inv_s==1] #error
+            in_vol[:, masks_inv_s==1] = comp_s[:, masks_inv_s==1] 
             in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3)
             
             #mask transfer from target to source 
             proj_mask_t = proj_mask_t + mask_aux
             proj_mask = proj_mask * proj_mask_t
-            proj_mask = proj_mask.cuda().long()
-            proj_mask_t = proj_mask_t.cuda()
+            # proj_mask = proj_mask.cuda().long()
+            # proj_mask_t = proj_mask_t.cuda()
             proj_labels = proj_labels * proj_mask
             in_vol = in_vol * proj_mask_t.float().unsqueeze(1)
 
@@ -665,6 +665,13 @@ class Trainer():
             ##############################
             model.train()
             model.DA = False
+
+            if not self.multi_gpu and self.gpu: 
+                in_vol = in_vol.cuda()
+
+            if self.gpu: 
+                proj_labels = proj_labels.cuda().long()
+
             # compute output
             if self.uncertainty:
                 output = model(in_vol)
@@ -685,6 +692,7 @@ class Trainer():
             else:
                 loss_m.backward()
             optimizer.step()
+            loss_m = loss_m.cpu()
 
             # measure accuracy and record loss
             loss = (loss_m + loss_aux).mean()
