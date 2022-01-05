@@ -603,17 +603,17 @@ class Trainer():
             model.DA = True
 
             ## unfreeze UDA specific layer
-            for param in model.upBlock_aux1.parameters(): 
+            for param in model.module.upBlock_aux1.parameters(): 
                 param.requires_grad = True 
-            for param in model.upBlock_aux2.parameters(): 
+            for param in model.module.upBlock_aux2.parameters(): 
                 param.requires_grad = True
-            for param in model.upBlock_aux3.parameters(): 
+            for param in model.module.upBlock_aux3.parameters(): 
                 param.requires_grad = True 
-            for param in model.upBlock_aux4.parameters(): 
+            for param in model.module.upBlock_aux4.parameters(): 
                 param.requires_grad = True
-            for param in model.logits_aux.parameters(): 
+            for param in model.module.logits_aux.parameters(): 
                 param.requires_grad = True
-            for block in [model.resBlock1, model.resBlock2, model.resBlock3, model.resBlock4, model.resBlock5]: 
+            for block in [model.module.resBlock1, model.module.resBlock2, model.module.resBlock3, model.module.resBlock4, model.module.resBlock5]: 
                 block.ga1.conv1.weight.requires_grad = True
                 block.ga1.conv1.bias.requires_grad = True 
                 block.ga2.conv1.weight.requires_grad = True
@@ -665,17 +665,17 @@ class Trainer():
             model.eval()
 
             ## freeze UDA specific layer
-            for param in model.upBlock_aux1.parameters(): 
+            for param in model.module.upBlock_aux1.parameters(): 
                 param.requires_grad = False 
-            for param in model.upBlock_aux2.parameters(): 
+            for param in model.module.upBlock_aux2.parameters(): 
                 param.requires_grad = False
-            for param in model.upBlock_aux3.parameters(): 
+            for param in model.module.upBlock_aux3.parameters(): 
                 param.requires_grad = False 
-            for param in model.upBlock_aux4.parameters(): 
+            for param in model.module.upBlock_aux4.parameters(): 
                 param.requires_grad = False
-            for param in model.logits_aux.parameters(): 
+            for param in model.module.logits_aux.parameters(): 
                 param.requires_grad = False
-            for block in [model.resBlock1, model.resBlock2, model.resBlock3, model.resBlock4, model.resBlock5]: 
+            for block in [model.module.resBlock1, model.module.resBlock2, model.module.resBlock3, model.module.resBlock4, model.module.resBlock5]: 
                 block.ga1.conv1.weight.requires_grad = False
                 block.ga1.conv1.bias.requires_grad = False 
                 block.ga2.conv1.weight.requires_grad = False
