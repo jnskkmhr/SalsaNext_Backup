@@ -594,14 +594,14 @@ class Trainer():
             torch.cuda.empty_cache()
         
         end = time.time()
-        print('loader length', len(train_loader))
-        print(iter(train_loader).next()[0][0].size())
-        print(iter(train_loader).next()[0][1].size())
-        print(iter(train_loader).next()[0][2].size())
-        print(iter(train_loader).next()[1][0].size())
-        print(iter(train_loader).next()[1][1].size())
         for i, (source_item, target_item) in enumerate(train_loader):
-            print("batch iteration {}".format(i))
+            print('loader length', len(train_loader))
+            print(iter(train_loader).next()[0][0].size())
+            print(iter(train_loader).next()[0][1].size())
+            print(iter(train_loader).next()[0][2].size())
+            print(iter(train_loader).next()[1][0].size())
+            print(iter(train_loader).next()[1][1].size())
+            print('batch iteration {}'.format(i))
             in_vol = source_item[0]
             proj_mask = source_item[1]
             proj_labels = source_item[2]
@@ -633,7 +633,7 @@ class Trainer():
             model.DA = True
 
             ## unfreeze UDA specific layer
-            print("unfreeze UDA specific layer")
+            print('unfreeze UDA specific laye')
             for param in model.module.upBlock_aux1.parameters(): 
                 param.requires_grad = True 
             for param in model.module.upBlock_aux2.parameters(): 
@@ -673,8 +673,8 @@ class Trainer():
             # if self.gpu: 
             #     proj_labels = proj_labels.cuda().long()
             
-            print("proj_in device: ", proj_in.device)
-            print("image_aux device", image_aux.device)
+            print('proj_in device: ', proj_in.device)
+            print('image_aux device', image_aux.device)
                 
             _, reconst = model(image_aux)
             loss_aux = beta * self.AuxiliaryLoss(proj_in, reconst)
@@ -697,7 +697,7 @@ class Trainer():
             model.eval()
 
             ## freeze UDA specific layer
-            print("freeze UDA specific layer")
+            print('freeze UDA specific layer')
             for param in model.module.upBlock_aux1.parameters(): 
                 param.requires_grad = False 
             for param in model.module.upBlock_aux2.parameters(): 
