@@ -595,6 +595,7 @@ class Trainer():
         
         end = time.time()
         print('loader length', len(train_loader))
+        print(iter(train_loader).next()[0].size())
         for i, (source_item, target_item) in enumerate(train_loader):
             print("batch iteration {}".format(i))
             in_vol, proj_mask, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _ = source_item 
