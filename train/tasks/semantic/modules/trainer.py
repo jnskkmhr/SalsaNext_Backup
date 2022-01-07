@@ -594,7 +594,7 @@ class Trainer():
             torch.cuda.empty_cache()
         
         end = time.time()
-        
+        print('loader length', len(train_loader))
         for i, (source_item, target_item) in enumerate(train_loader):
             print("batch iteration {}".format(i))
             in_vol, proj_mask, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _ = source_item 
