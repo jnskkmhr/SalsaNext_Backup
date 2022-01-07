@@ -603,6 +603,7 @@ class Trainer():
             model.DA = True
 
             ## unfreeze UDA specific layer
+            print("unfreeze UDA specific layer")
             for param in model.module.upBlock_aux1.parameters(): 
                 param.requires_grad = True 
             for param in model.module.upBlock_aux2.parameters(): 
@@ -666,6 +667,7 @@ class Trainer():
             model.eval()
 
             ## freeze UDA specific layer
+            print("freeze UDA specific layer")
             for param in model.module.upBlock_aux1.parameters(): 
                 param.requires_grad = False 
             for param in model.module.upBlock_aux2.parameters(): 
