@@ -13,6 +13,7 @@ import cv2
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
+from torch.utils.data import DataLoader, Dataset 
 
 import torch.optim as optim
 from matplotlib import pyplot as plt
@@ -27,6 +28,17 @@ from tasks.semantic.modules.SalsaNextAdf import *
 from tasks.semantic.modules.SalsaNextDA import * 
 from tasks.semantic.modules.Lovasz_Softmax import Lovasz_softmax
 import tasks.semantic.modules.adf as adf
+
+
+class ConcatDataset(Dataset):
+    def __init__(self, *datasets):
+        self.datasets = datasets
+
+    def __getitem__(self, i):
+        return tuple(d[i] for d in self.datasets)
+
+    def __len__(self):
+        return min(len(d) for d in self.datasets)
 
 def keep_variance_fn(x):
     return x + 1e-3
@@ -129,6 +141,13 @@ class Trainer():
                                                workers=self.ARCH["train"]["workers"],
                                                gt=False,
                                                shuffle_train=False)
+
+        # concat trainset and testset and transform it to dataloader 
+        if self.DA: 
+            self.trainloader = DataLoader(
+                        ConcatDataset(self.parser.get_train_set(), self.parser_test.get_train_set()),
+                        batch_size=self.ARCH["train"]["batch_size"], shuffle=True,
+                        num_workers=self.ARCH["train"]["workers"], drop_last=True)
 
         # weights for loss (and bias)
 
@@ -291,8 +310,7 @@ class Trainer():
             print("Epoch {}/{}".format(epoch+1, self.ARCH["train"]["max_epochs"]))
             # train for 1 epoch
             if self.DA: 
-                acc, iou, loss, update_mean,hetero_l = self.train_epoch_da(train_loader=self.parser.get_train_set(),
-                                                            test_loader=self.parser_test.get_train_set(), 
+                acc, iou, loss, update_mean,hetero_l = self.train_epoch_da(train_loader=self.trainloader, 
                                                             model=self.model,
                                                             criterion=self.criterion,
                                                             optimizer=self.optimizer,
@@ -303,7 +321,7 @@ class Trainer():
                                                             report=self.ARCH["train"]["report_batch"],
                                                             show_scans=self.ARCH["train"]["show_scans"])
             else: 
-                acc, iou, loss, update_mean,hetero_l = self.train_epoch(train_loader=self.parser.get_train_set(), 
+                acc, iou, loss, update_mean,hetero_l = self.train_epoch(train_loader=self.parser.get_train_loader(), 
                                                             model=self.model,
                                                             criterion=self.criterion,
                                                             optimizer=self.optimizer,
@@ -344,7 +362,7 @@ class Trainer():
             if epoch % self.ARCH["train"]["report_epoch"] == 0:
                 # evaluate on validation set
                 print("*" * 80)
-                acc, iou, loss, rand_img,hetero_l = self.validate(val_loader=self.parser.get_valid_set(),
+                acc, iou, loss, rand_img,hetero_l = self.validate(val_loader=self.parser.get_valid_loader(),
                                                          model=self.model,
                                                          criterion=self.criterion,
                                                          evaluator=self.evaluator,
@@ -561,7 +579,7 @@ class Trainer():
 
         return acc.avg, iou.avg, losses.avg, update_ratio_meter.avg,hetero_l.avg
 
-    def train_epoch_da(self, train_loader, test_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10,
+    def train_epoch_da(self, train_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10,
                     show_scans=False):
         ''' 1 epoch train loop for SalSaNext with unsupervised domain adaptation'''
         losses = AverageMeter()
@@ -576,8 +594,8 @@ class Trainer():
             torch.cuda.empty_cache()
         
         end = time.time()
-    
-        for i, (source_item, target_item) in enumerate(zip(train_loader, cycle(test_loader))):
+        
+        for i, (source_item, target_item) in enumerate(train_loader):
             print("batch iteration {}".format(i))
             in_vol, proj_mask, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _ = source_item 
             proj_in, proj_mask_t, _, _, _, _, _, _, _, _, _, _, _, _, _ = target_item

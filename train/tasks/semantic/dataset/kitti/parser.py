@@ -417,20 +417,29 @@ class Parser():
     return scans
 
   def get_train_set(self):
+    return self.train_dataset
+
+  def get_train_loader(self):
     return self.trainloader
 
   def get_valid_batch(self):
     scans = self.validiter.next()
     return scans
-
+  
   def get_valid_set(self):
+    return self.valid_dataset
+
+  def get_valid_loader(self):
     return self.validloader
 
   def get_test_batch(self):
     scans = self.testiter.next()
     return scans
-
-  def get_test_set(self):
+  
+  def get_test_set(self): 
+    return self.test_dataset
+    
+  def get_test_loader(self):
     return self.testloader
 
   def get_train_size(self):
