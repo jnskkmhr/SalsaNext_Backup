@@ -124,9 +124,9 @@ class Trainer():
                                                learning_map_inv=self.DATA["learning_map_inv"],
                                                sensor=self.ARCH["dataset"]["sensor"],
                                                max_points=self.ARCH["dataset"]["max_points"],
-                                               batch_size=self.ARCH["train"]["batch_size"],
+                                               batch_size=self.ARCH["train"]["batch_size_test"],
                                                workers=self.ARCH["train"]["workers"],
-                                               gt=False,
+                                               gt=True,
                                                shuffle_train=False)
 
         # weights for loss (and bias)
@@ -623,8 +623,9 @@ class Trainer():
                 block.ga4.conv1.weight.requires_grad = True
                 block.ga4.conv1.bias.requires_grad = True
 
-            proj_in, image_aux = self.crop_target_image(proj_in)
-            proj_mask_t, mask_aux = self.crop_target_mask(proj_mask_t)
+            with torch.no_grad: 
+                proj_in, image_aux = self.crop_target_image(proj_in)
+                proj_mask_t, mask_aux = self.crop_target_mask(proj_mask_t)
 
             # if not self.multi_gpu and self.gpu:
             #     in_vol = in_vol.cuda()
@@ -654,7 +655,7 @@ class Trainer():
             else:
                 loss_aux.backward()
             optimizer.step()
-            loss_aux  = loss_aux.cpu()
+            # loss_aux  = loss_aux.cpu()
  
 
             #####################################
@@ -736,7 +737,7 @@ class Trainer():
             else:
                 loss_m.backward()
             optimizer.step()
-            loss_m = loss_m.cpu()
+            # loss_m = loss_m.cpu()
 
             # measure accuracy and record loss
             loss = (loss_m + loss_aux).mean()
