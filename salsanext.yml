@@ -10,7 +10,7 @@ train:
   lr_decay: 0.99         # learning rate decay per epoch after initial cycle (from min lr)
   w_decay: 0.0001        # weight decay
   batch_size: 16         # batch size of train source
-  batch_size_test: 8     # batch size of test source
+  batch_size_test: 16     # batch size of test source
   report_batch: 10        # every x batches, report loss
   report_epoch: 1        # every x epochs, report validation set
   epsilon_w: 0.001       # class weight w = 1 / (content + epsilon_w)
