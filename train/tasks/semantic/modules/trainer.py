@@ -118,7 +118,7 @@ class Trainer():
                                                train_sequences=self.DATA["split"]["train"],
                                                valid_sequences=self.DATA["split"]["valid"],
                                                test_sequences=self.DATA["split"]["test"],
-                                               labels=self.DATA["labels"],
+                                               labels=None,
                                                color_map=self.DATA["color_map"],
                                                learning_map=self.DATA["learning_map"],
                                                learning_map_inv=self.DATA["learning_map_inv"],

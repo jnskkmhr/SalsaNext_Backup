@@ -104,8 +104,12 @@ class SemanticKitti(Dataset):
     else:
       raise ValueError("Sequences folder doesn't exist! Exiting...")
 
+    if not self.gt: 
+      print('label file not exist! Ignoring')
+
     # make sure labels is a dict
-    assert(isinstance(self.labels, dict))
+    if self.gt: 
+      assert(isinstance(self.labels, dict))
 
     # make sure color_map is a dict
     assert(isinstance(self.color_map, dict))
@@ -116,38 +120,75 @@ class SemanticKitti(Dataset):
     # make sure sequences is a list
     assert(isinstance(self.sequences, list))
 
-    # placeholder for filenames
-    self.scan_files = []
-    self.label_files = []
 
-    # fill in with names, checking that all sequences are complete
-    for seq in self.sequences:
-      # to string
-      seq = '{0:02d}'.format(int(seq))
+    if self.gt: 
+      # placeholder for filenames
+      self.scan_files = []
+      self.label_files = []
 
-      print("parsing seq {}".format(seq))
+      # fill in with names, checking that all sequences are complete
+      for seq in self.sequences:
+        # to string
+        seq = '{0:02d}'.format(int(seq))
 
-      # get paths for each
-      scan_path = os.path.join(self.root, seq, "velodyne")
-      label_path = os.path.join(self.root, seq, "labels")
+        print("parsing seq {}".format(seq))
 
-      # get files
-      scan_files = [os.path.join(dp, f) for dp, dn, fn in os.walk(
-          os.path.expanduser(scan_path)) for f in fn if is_scan(f)]
-      label_files = [os.path.join(dp, f) for dp, dn, fn in os.walk(
-          os.path.expanduser(label_path)) for f in fn if is_label(f)]
+        # get paths for each
+        scan_path = os.path.join(self.root, seq, "velodyne")
+        label_path = os.path.join(self.root, seq, "labels")
 
-      # check all scans have labels
-      if self.gt:
-        assert(len(scan_files) == len(label_files))
+        # get files
+        scan_files = [os.path.join(dp, f) for dp, dn, fn in os.walk(
+            os.path.expanduser(scan_path)) for f in fn if is_scan(f)]
+        label_files = [os.path.join(dp, f) for dp, dn, fn in os.walk(
+            os.path.expanduser(label_path)) for f in fn if is_label(f)]
 
-      # extend list
-      self.scan_files.extend(scan_files)
-      self.label_files.extend(label_files)
+        # check all scans have labels
+        if self.gt:
+          assert(len(scan_files) == len(label_files))
 
-    # sort for correspondance
-    self.scan_files.sort()
-    self.label_files.sort()
+        # extend list
+        self.scan_files.extend(scan_files)
+        self.label_files.extend(label_files)
+
+      # sort for correspondance
+      self.scan_files.sort()
+      self.label_files.sort()
+
+    ## when label does not exist
+    else: 
+      # placeholder for filenames
+      self.scan_files = []
+      # self.label_files = []
+
+      # fill in with names, checking that all sequences are complete
+      for seq in self.sequences:
+        # to string
+        seq = '{0:02d}'.format(int(seq))
+
+        print("parsing seq {}".format(seq))
+
+        # get paths for each
+        scan_path = os.path.join(self.root, seq, "velodyne")
+        # label_path = os.path.join(self.root, seq, "labels")
+
+        # get files
+        scan_files = [os.path.join(dp, f) for dp, dn, fn in os.walk(
+            os.path.expanduser(scan_path)) for f in fn if is_scan(f)]
+        # label_files = [os.path.join(dp, f) for dp, dn, fn in os.walk(
+        #     os.path.expanduser(label_path)) for f in fn if is_label(f)]
+
+        # check all scans have labels
+        # if self.gt:
+        #   assert(len(scan_files) == len(label_files))
+
+        # extend list
+        self.scan_files.extend(scan_files)
+        # self.label_files.extend(label_files)
+
+      # sort for correspondance
+      self.scan_files.sort()
+      # self.label_files.sort()
 
     print("Using {} scans from sequences {}".format(len(self.scan_files),
                                                     self.sequences))
