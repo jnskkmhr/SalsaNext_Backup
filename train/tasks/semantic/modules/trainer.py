@@ -577,7 +577,7 @@ class Trainer():
         
         end = time.time()
     
-        for i, (source_item, target_item) in enumerate(zip(cycle(train_loader), test_loader)):
+        for i, (source_item, target_item) in enumerate(zip(train_loader, cycle(test_loader))):
             print("batch iteration {}".format(i))
             in_vol, proj_mask, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _ = source_item 
             proj_in, proj_mask_t, _, _, _, _, _, _, _, _, _, _, _, _, _ = target_item
