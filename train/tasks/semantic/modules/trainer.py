@@ -623,7 +623,7 @@ class Trainer():
                 block.ga4.conv1.weight.requires_grad = True
                 block.ga4.conv1.bias.requires_grad = True
 
-            with torch.no_grad: 
+            with torch.no_grad(): 
                 proj_in, image_aux = self.crop_target_image(proj_in)
                 proj_mask_t, mask_aux = self.crop_target_mask(proj_mask_t)
 
