@@ -602,8 +602,13 @@ class Trainer():
         print(iter(train_loader).next()[1][1].size())
         for i, (source_item, target_item) in enumerate(train_loader):
             print("batch iteration {}".format(i))
-            in_vol, proj_mask, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _ = source_item 
-            proj_in, proj_mask_t, _, _, _, _, _, _, _, _, _, _, _, _, _ = target_item
+            in_vol = source_item[0]
+            proj_mask = source_item[1]
+            proj_labels = source_item[2]
+            proj_in = target_item[0]
+            proj_mask_t = target_item[1]
+            # in_vol, proj_mask, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _ = source_item 
+            # proj_in, proj_mask_t, _, _, _, _, _, _, _, _, _, _, _, _, _ = target_item
 
             # measure data loading time
             self.data_time_t.update(time.time() - end)
