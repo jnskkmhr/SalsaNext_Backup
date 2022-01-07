@@ -6,6 +6,7 @@ import time
 import imp
 import copy 
 from random import randint 
+from itertools import cycle
 
 from torch import random
 import cv2
@@ -575,11 +576,11 @@ class Trainer():
             torch.cuda.empty_cache()
         
         end = time.time()
-        print(end)
-        for i, (source_item, target_item) in enumerate(zip(train_loader, test_loader)):
+    
+        for i, (source_item, target_item) in enumerate(zip(cycle(train_loader), test_loader)):
             print("batch iteration {}".format(i))
-            in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _ = source_item 
-            proj_in, proj_mask_t, _, _, _, _, p_x, p_y, p_z, proj_range, unproj_range, _, _, _, npoints = target_item
+            in_vol, proj_mask, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _ = source_item 
+            proj_in, proj_mask_t, _, _, _, _, _, _, _, _, _, _, _, _, _ = target_item
 
             # measure data loading time
             self.data_time_t.update(time.time() - end)
