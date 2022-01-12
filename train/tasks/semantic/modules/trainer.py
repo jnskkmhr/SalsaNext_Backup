@@ -139,7 +139,7 @@ class Trainer():
                                                max_points=self.ARCH["dataset"]["max_points"],
                                                batch_size=self.ARCH["train"]["batch_size_test"],
                                                workers=self.ARCH["train"]["workers"],
-                                               gt=True,
+                                               gt=False,
                                                shuffle_train=False)
 
         # concat trainset and testset and transform it to dataloader 
