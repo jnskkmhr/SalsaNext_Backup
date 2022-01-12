@@ -551,8 +551,8 @@ class Trainer():
                 hetero_l.update(hetero.mean().item(), in_vol.size(0))
                 output = output_mean
             else:
-                assert output.size == proj_labels.size(). print("mismatch between output and target size...")
                 output = model(in_vol, uda=False)
+                assert output.size == proj_labels.size(). print("mismatch between output and target size...")
                 loss_m = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + self.ls(output, proj_labels.long())
 
             optimizer.zero_grad()
