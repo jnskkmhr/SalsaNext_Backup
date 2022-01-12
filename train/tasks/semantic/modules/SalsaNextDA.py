@@ -228,18 +228,26 @@ class SalsaNextDA(nn.Module):
             self.upBlock_aux4 = UpBlock(2 * 32, 32, 0.2, drop_out=False)
             self.logits_aux = nn.Conv2d(32, 5, kernel_size=(1, 1)) 
 
-    def forward(self, x):
+    def forward(self, x, uda=True):
         downCntx = self.downCntx(x)
         downCntx = self.downCntx2(downCntx)
         downCntx = self.downCntx3(downCntx)
 
-        down0c, down0b = self.resBlock1(downCntx, self.DA)
-        down1c, down1b = self.resBlock2(down0c, self.DA)
-        down2c, down2b = self.resBlock3(down1c, self.DA)
-        down3c, down3b = self.resBlock4(down2c, self.DA)
-        down5c = self.resBlock5(down3c, self.DA)
+        down0c, down0b = self.resBlock1(downCntx, uda)
+        down1c, down1b = self.resBlock2(down0c, uda)
+        down2c, down2b = self.resBlock3(down1c, uda)
+        down3c, down3b = self.resBlock4(down2c, uda)
+        down5c = self.resBlock5(down3c, uda)
 
-        if not self.DA: 
+        if uda: 
+            up4e_aux = self.upBlock_aux1(down5c,down3b)
+            up3e_aux = self.upBlock_aux2(up4e_aux, down2b)
+            up2e_aux = self.upBlock_aux3(up3e_aux, down1b)
+            up1e_aux = self.upBlock_aux4(up2e_aux, down0b)
+            logits_aux = self.logits_aux(up1e_aux)
+            return logits_aux
+
+        else: 
             up4e = self.upBlock1(down5c,down3b)
             up3e = self.upBlock2(up4e, down2b)
             up2e = self.upBlock3(up3e, down1b)
@@ -247,11 +255,3 @@ class SalsaNextDA(nn.Module):
             logits = self.logits(up1e)
             logits = F.softmax(logits, dim=1)
             return logits 
-
-        elif self.DA: 
-            up4e_aux = self.upBlock_aux1(down5c,down3b)
-            up3e_aux = self.upBlock_aux2(up4e_aux, down2b)
-            up2e_aux = self.upBlock_aux3(up3e_aux, down1b)
-            up1e_aux = self.upBlock_aux4(up2e_aux, down0b)
-            logits_aux = self.logits_aux(up1e_aux)
-            return logits_aux

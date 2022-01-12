@@ -440,7 +440,6 @@ class Trainer():
             ############# method1 ############
             print("method 1")
             model.train()
-            model.DA = True
             ## unfreeze UDA specific layer
             print('unfreeze UDA specific laye')
             for param in model.module.upBlock_aux1.parameters(): 
@@ -468,7 +467,7 @@ class Trainer():
                 _, proj_mask_t_aux = self.crop_target_mask(proj_mask_t)
             
                 
-            reconst = model(in_vol_t_aux)
+            reconst = model(in_vol_t_aux, uda=True)
             loss_aux = beta * self.AuxiliaryLoss(reconst, in_vol_t)
 
             optimizer.zero_grad()
@@ -515,7 +514,7 @@ class Trainer():
                 block.ga4.conv1.weight.requires_grad = False
                 block.ga4.conv1.bias.requires_grad = False
 
-            comp_s = model(in_vol)
+            comp_s = model(in_vol, uda=True)
             comp_s = comp_s.cpu()
             masks_inv_s = 1 - proj_mask
             in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3) #swap batch and channel dim
@@ -538,7 +537,6 @@ class Trainer():
             ################### method3 ######################
             print("method 3")
             model.train()
-            model.DA = False
 
             if not self.multi_gpu and self.gpu: 
                 in_vol = in_vol.cuda()
@@ -548,7 +546,7 @@ class Trainer():
 
             # compute output
             if self.uncertainty:
-                output = model(in_vol)
+                output = model(in_vol, uda=False)
                 output_mean, _ = adf.Softmax(dim=1, keep_variance_fn=keep_variance_fn)(*output)
                 hetero = self.SoftmaxHeteroscedasticLoss(output,proj_labels)
                 loss_m = criterion(output_mean.clamp(min=1e-8), proj_labels) + hetero + self.ls(output_mean, proj_labels.long())
@@ -556,7 +554,7 @@ class Trainer():
                 hetero_l.update(hetero.mean().item(), in_vol.size(0))
                 output = output_mean
             else:
-                output = model(in_vol)
+                output = model(in_vol, uda=False)
                 print('output', output.size())
                 print('label', proj_labels.size())
                 loss_m = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + self.ls(output, proj_labels.long())
