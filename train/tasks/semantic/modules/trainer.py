@@ -129,7 +129,7 @@ class Trainer():
         # ラベルがついていない、データセットを取ってきたい
         self.parser_test = parserModule.Parser(root=self.datadir,
                                                train_sequences=self.DATA["split"]["train"],
-                                               valid_sequences=None,
+                                               valid_sequences=self.DATA["split"]["valid"],
                                                test_sequences=None,
                                                labels=self.DATA["labels"],
                                                color_map=self.DATA["color_map"],
