@@ -518,9 +518,6 @@ class Trainer():
             comp_s = comp_s.cpu()
             masks_inv_s = 1 - proj_mask
             in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3) #swap batch and channel dim
-            print("comp_s device: ", comp_s.device)
-            print("in_vol device: ", in_vol.device)
-            print("mask_inv_s device", masks_inv_s.device)
             in_vol[:, masks_inv_s==1] = comp_s[:, masks_inv_s==1] 
             in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3)
             
@@ -555,8 +552,6 @@ class Trainer():
                 output = output_mean
             else:
                 output = model(in_vol, uda=False)
-                print('output', output.size())
-                print('label', proj_labels.size())
                 loss_m = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + self.ls(output, proj_labels.long())
 
             optimizer.zero_grad()
