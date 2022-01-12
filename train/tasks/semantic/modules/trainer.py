@@ -552,7 +552,7 @@ class Trainer():
                 output = output_mean
             else:
                 output = model(in_vol, uda=False)
-                assert output.size == proj_labels.size(). print("mismatch between output and target size...")
+                assert output.size == proj_labels.size(), print("mismatch between output and target size...")
                 loss_m = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + self.ls(output, proj_labels.long())
 
             optimizer.zero_grad()
