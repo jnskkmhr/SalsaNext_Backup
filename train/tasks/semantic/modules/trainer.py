@@ -441,26 +441,26 @@ class Trainer():
             print("method 1")
             model.train()
             ## unfreeze UDA specific layer
-            print('unfreeze UDA specific laye')
-            for param in model.module.upBlock_aux1.parameters(): 
-                param.requires_grad = True 
-            for param in model.module.upBlock_aux2.parameters(): 
-                param.requires_grad = True
-            for param in model.module.upBlock_aux3.parameters(): 
-                param.requires_grad = True 
-            for param in model.module.upBlock_aux4.parameters(): 
-                param.requires_grad = True
-            for param in model.module.logits_aux.parameters(): 
-                param.requires_grad = True
-            for block in [model.module.resBlock1, model.module.resBlock2, model.module.resBlock3, model.module.resBlock4, model.module.resBlock5]: 
-                block.ga1.conv1.weight.requires_grad = True
-                block.ga1.conv1.bias.requires_grad = True 
-                block.ga2.conv1.weight.requires_grad = True
-                block.ga2.conv1.bias.requires_grad = True
-                block.ga3.conv1.weight.requires_grad = True
-                block.ga3.conv1.bias.requires_grad = True
-                block.ga4.conv1.weight.requires_grad = True
-                block.ga4.conv1.bias.requires_grad = True
+            # print('unfreeze UDA specific laye')
+            # for param in model.module.upBlock_aux1.parameters(): 
+            #     param.requires_grad = True 
+            # for param in model.module.upBlock_aux2.parameters(): 
+            #     param.requires_grad = True
+            # for param in model.module.upBlock_aux3.parameters(): 
+            #     param.requires_grad = True 
+            # for param in model.module.upBlock_aux4.parameters(): 
+            #     param.requires_grad = True
+            # for param in model.module.logits_aux.parameters(): 
+            #     param.requires_grad = True
+            # for block in [model.module.resBlock1, model.module.resBlock2, model.module.resBlock3, model.module.resBlock4, model.module.resBlock5]: 
+            #     block.ga1.conv1.weight.requires_grad = True
+            #     block.ga1.conv1.bias.requires_grad = True 
+            #     block.ga2.conv1.weight.requires_grad = True
+            #     block.ga2.conv1.bias.requires_grad = True
+            #     block.ga3.conv1.weight.requires_grad = True
+            #     block.ga3.conv1.bias.requires_grad = True
+            #     block.ga4.conv1.weight.requires_grad = True
+            #     block.ga4.conv1.bias.requires_grad = True
 
             with torch.no_grad(): 
                 _, in_vol_t_aux = self.crop_target_image(in_vol_t)
@@ -493,26 +493,26 @@ class Trainer():
             model.eval()
 
             ## freeze UDA specific layer
-            print('freeze UDA specific layer')
-            for param in model.module.upBlock_aux1.parameters(): 
-                param.requires_grad = False 
-            for param in model.module.upBlock_aux2.parameters(): 
-                param.requires_grad = False
-            for param in model.module.upBlock_aux3.parameters(): 
-                param.requires_grad = False 
-            for param in model.module.upBlock_aux4.parameters(): 
-                param.requires_grad = False
-            for param in model.module.logits_aux.parameters(): 
-                param.requires_grad = False
-            for block in [model.module.resBlock1, model.module.resBlock2, model.module.resBlock3, model.module.resBlock4, model.module.resBlock5]: 
-                block.ga1.conv1.weight.requires_grad = False
-                block.ga1.conv1.bias.requires_grad = False 
-                block.ga2.conv1.weight.requires_grad = False
-                block.ga2.conv1.bias.requires_grad = False
-                block.ga3.conv1.weight.requires_grad = False
-                block.ga3.conv1.bias.requires_grad = False
-                block.ga4.conv1.weight.requires_grad = False
-                block.ga4.conv1.bias.requires_grad = False
+            # print('freeze UDA specific layer')
+            # for param in model.module.upBlock_aux1.parameters(): 
+            #     param.requires_grad = False 
+            # for param in model.module.upBlock_aux2.parameters(): 
+            #     param.requires_grad = False
+            # for param in model.module.upBlock_aux3.parameters(): 
+            #     param.requires_grad = False 
+            # for param in model.module.upBlock_aux4.parameters(): 
+            #     param.requires_grad = False
+            # for param in model.module.logits_aux.parameters(): 
+            #     param.requires_grad = False
+            # for block in [model.module.resBlock1, model.module.resBlock2, model.module.resBlock3, model.module.resBlock4, model.module.resBlock5]: 
+            #     block.ga1.conv1.weight.requires_grad = False
+            #     block.ga1.conv1.bias.requires_grad = False 
+            #     block.ga2.conv1.weight.requires_grad = False
+            #     block.ga2.conv1.bias.requires_grad = False
+            #     block.ga3.conv1.weight.requires_grad = False
+            #     block.ga3.conv1.bias.requires_grad = False
+            #     block.ga4.conv1.weight.requires_grad = False
+            #     block.ga4.conv1.bias.requires_grad = False
 
             comp_s = model(in_vol, uda=True)
             comp_s = comp_s.cpu()
@@ -551,6 +551,7 @@ class Trainer():
                 hetero_l.update(hetero.mean().item(), in_vol.size(0))
                 output = output_mean
             else:
+                assert output.size == proj_labels.size(). print("mismatch between output and target size...")
                 output = model(in_vol, uda=False)
                 loss_m = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + self.ls(output, proj_labels.long())
 
