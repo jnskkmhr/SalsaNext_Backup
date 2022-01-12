@@ -555,7 +555,7 @@ class Trainer():
                 print('output', output.size())
                 print('label', proj_labels.size())
                 # loss_m = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + self.ls(output, proj_labels.long())
-                loss_m = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) 
+                loss_m = self.ls(output, proj_labels.long())
 
             optimizer.zero_grad()
             if self.n_gpus > 1:
