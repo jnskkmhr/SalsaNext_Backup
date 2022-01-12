@@ -127,9 +127,9 @@ class Trainer():
                                           shuffle_train=True)
 
         # ラベルがついていない、データセットを取ってきたい
-        self.parser_test = parserModule.Parser(root=self.datadir,
-                                               train_sequences=self.DATA["split"]["train"],
-                                               valid_sequences=self.DATA["split"]["valid"],
+        self.parser_test = parserModule.Parser(root=self.testdir,
+                                               train_sequences=[4],
+                                               valid_sequences=[4],
                                                test_sequences=None,
                                                labels=self.DATA["labels"],
                                                color_map=self.DATA["color_map"],
