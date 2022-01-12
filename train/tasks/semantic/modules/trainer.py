@@ -129,9 +129,9 @@ class Trainer():
         # ラベルがついていない、データセットを取ってきたい
         self.parser_test = parserModule.Parser(root=self.datadir,
                                                train_sequences=self.DATA["split"]["train"],
-                                               valid_sequences=self.DATA["split"]["valid"],
-                                               test_sequences=self.DATA["split"]["test"],
-                                               labels=None,
+                                               valid_sequences=None,
+                                               test_sequences=None,
+                                               labels=self.DATA["labels"],
                                                color_map=self.DATA["color_map"],
                                                learning_map=self.DATA["learning_map"],
                                                learning_map_inv=self.DATA["learning_map_inv"],
@@ -139,7 +139,7 @@ class Trainer():
                                                max_points=self.ARCH["dataset"]["max_points"],
                                                batch_size=self.ARCH["train"]["batch_size_test"],
                                                workers=self.ARCH["train"]["workers"],
-                                               gt=False,
+                                               gt=True,
                                                shuffle_train=False)
 
         # concat trainset and testset and transform it to dataloader 
@@ -593,6 +593,7 @@ class Trainer():
             self.data_time_t.update(time.time() - end)
 
             ############# method1 ############
+            print("method 1")
             model.train()
             model.DA = True
             ## unfreeze UDA specific layer
@@ -618,8 +619,8 @@ class Trainer():
                 block.ga4.conv1.bias.requires_grad = True
 
             with torch.no_grad(): 
-                in_vol_t_aux, _ = self.crop_target_image(in_vol_t)
-                proj_mask_t_aux, _ = self.crop_target_mask(proj_mask_t)
+                _, in_vol_t_aux = self.crop_target_image(in_vol_t)
+                _, proj_mask_t_aux = self.crop_target_mask(proj_mask_t)
             
                 
             reconst = model(in_vol_t_aux)
@@ -642,6 +643,7 @@ class Trainer():
                 torch.cuda.empty_cache()
             
             ################# method2 #####################
+            print("method 2")
             #mask_inv_s : [B, W, H]
             #in_vol, comp_s : [B, C, W, H]
             model.eval()
@@ -689,6 +691,7 @@ class Trainer():
                 torch.cuda.empty_cache()
 
             ################### method3 ######################
+            print("method 3")
             model.train()
             model.DA = False
 
