@@ -127,7 +127,7 @@ class Trainer():
                                           shuffle_train=True)
 
         # ラベルがついていない、データセットを取ってきたい
-        self.parser_test = parserModule.Parser(root=self.testdir,
+        self.parser_test = parserModule.Parser(root=self.datadir,
                                                train_sequences=self.DATA["split"]["train"],
                                                valid_sequences=self.DATA["split"]["valid"],
                                                test_sequences=self.DATA["split"]["test"],
@@ -622,7 +622,7 @@ class Trainer():
                 proj_mask_t_aux, _ = self.crop_target_mask(proj_mask_t)
             
                 
-            _, reconst = model(in_vol_t_aux)
+            reconst = model(in_vol_t_aux)
             loss_aux = beta * self.AuxiliaryLoss(reconst, in_vol_t)
 
             optimizer.zero_grad()
@@ -668,7 +668,7 @@ class Trainer():
                 block.ga4.conv1.weight.requires_grad = False
                 block.ga4.conv1.bias.requires_grad = False
 
-            _, comp_s = model(in_vol)
+            comp_s = model(in_vol)
             comp_s = comp_s.cpu()
             masks_inv_s = 1 - proj_mask
             in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3) #swap batch and channel dim

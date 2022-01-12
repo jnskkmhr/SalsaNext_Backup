@@ -241,11 +241,14 @@ class SalsaNextDA(nn.Module):
         down3c, down3b = self.resBlock4(down2c, self.DA)
         down5c = self.resBlock5(down3c, self.DA)
 
-        up4e = self.upBlock1(down5c,down3b)
-        up3e = self.upBlock2(up4e, down2b)
-        up2e = self.upBlock3(up3e, down1b)
-        up1e = self.upBlock4(up2e, down0b)
-        logits = self.logits(up1e)
+        if not self.DA: 
+            up4e = self.upBlock1(down5c,down3b)
+            up3e = self.upBlock2(up4e, down2b)
+            up2e = self.upBlock3(up3e, down1b)
+            up1e = self.upBlock4(up2e, down0b)
+            logits = self.logits(up1e)
+            logits = F.softmax(logits, dim=1)
+            return logits 
 
         if self.DA: 
             up4e_aux = self.upBlock_aux1(down5c,down3b)
@@ -253,12 +256,4 @@ class SalsaNextDA(nn.Module):
             up2e_aux = self.upBlock_aux3(up3e_aux, down1b)
             up1e_aux = self.upBlock_aux4(up2e_aux, down0b)
             logits_aux = self.logits_aux(up1e_aux)
-
-            logits_aux = logits_aux
-
-        logits = F.softmax(logits, dim=1)
-        
-        if self.DA: 
-            return logits, logits_aux 
-        else: 
-            return logits 
+            return logits_aux
