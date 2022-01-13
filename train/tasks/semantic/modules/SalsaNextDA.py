@@ -255,5 +255,5 @@ class SalsaNextDA(nn.Module):
             up1e = self.upBlock4(up2e, down0b)
             logits = self.logits(up1e)
             logits = logits 
-            logits = F.softmax(logits, dim=1)
+            logits = F.log_softmax(logits, dim=1)
             return logits 
