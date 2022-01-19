@@ -73,7 +73,7 @@ class LaserScanVis:
 
     # img canvas size
     self.multiplier = 1
-    self.canvas_W = 1024
+    self.canvas_W = 2048
     self.canvas_H = 64
     if self.semantics:
       self.multiplier += 1

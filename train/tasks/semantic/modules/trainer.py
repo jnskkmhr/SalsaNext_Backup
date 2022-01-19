@@ -127,8 +127,8 @@ class Trainer():
                                           shuffle_train=True)
 
         # ラベルがついていない、データセットを取ってきたい
-        self.parser_test = parserModule.Parser(root=self.testdir,
-                                               train_sequences=[4],
+        self.parser_test = parserModule.Parser(root="/home/acd13971vc/vls",
+                                               train_sequences=[1, 4],
                                                valid_sequences=[4],
                                                test_sequences=None,
                                                labels=self.DATA["labels"],
@@ -305,9 +305,8 @@ class Trainer():
 
         # train for n epochs
         for epoch in range(self.epoch, self.ARCH["train"]["max_epochs"]):
-            print("Epoch {}/{}".format(epoch+1, self.ARCH["train"]["max_epochs"]))
             # train for 1 epoch
-            acc, iou, loss, update_mean,hetero_l = self.train_epoch_da(train_loader=self.parser.get_train_loader(), 
+            acc, iou, loss, loss_2, loss_sum, update_mean,hetero_l = self.train_epoch(train_loader=self.parser.get_train_loader(), 
                                                         target_loader=self.parser_test.get_train_loader(), 
                                                         model=self.model,
                                                         criterion=self.criterion,
@@ -326,6 +325,8 @@ class Trainer():
             self.info["train_acc"] = acc
             self.info["train_iou"] = iou
             self.info["train_hetero"] = hetero_l
+            self.info["train_loss_2"] = loss_2
+            self.info["train_loss_sum"] = loss_sum
 
             # remember best iou and save checkpoint
             state = {'epoch': epoch, 'state_dict': self.model.state_dict(),
@@ -411,7 +412,7 @@ class Trainer():
         x_aux[:, :, idx] = 0 
         return x-x_aux, x_aux
 
-    def train_epoch_da(self, train_loader, target_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10,
+    def train_epoch(self, train_loader, target_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10,
                     show_scans=False):
         ''' 1 epoch train loop for SalSaNext with unsupervised domain adaptation'''
         losses = AverageMeter()
@@ -467,7 +468,7 @@ class Trainer():
                 _, proj_mask_t_aux = self.crop_target_mask(proj_mask_t)
             
                 
-            reconst = model(in_vol_t_aux, uda=True)
+            reconst = model(in_vol_t_aux, True, True)
             loss_aux = beta * self.AuxiliaryLoss(reconst, in_vol_t)
 
             optimizer.zero_grad()
@@ -514,7 +515,7 @@ class Trainer():
             #     block.ga4.conv1.weight.requires_grad = False
             #     block.ga4.conv1.bias.requires_grad = False
 
-            comp_s = model(in_vol, uda=True)
+            comp_s = model(in_vol, True, True)
             comp_s = comp_s.cpu()
             masks_inv_s = 1 - proj_mask
             in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3) #swap batch and channel dim
@@ -543,7 +544,7 @@ class Trainer():
 
             # compute output
             if self.uncertainty:
-                output = model(in_vol, uda=False)
+                output = model(in_vol)
                 output_mean, _ = adf.Softmax(dim=1, keep_variance_fn=keep_variance_fn)(*output)
                 hetero = self.SoftmaxHeteroscedasticLoss(output,proj_labels)
                 loss_m = criterion(output_mean.clamp(min=1e-8), proj_labels) + hetero + self.ls(output_mean, proj_labels.long())
@@ -551,7 +552,7 @@ class Trainer():
                 hetero_l.update(hetero.mean().item(), in_vol.size(0))
                 output = output_mean
             else:
-                output = model(in_vol, uda=False)
+                output = model(in_vol, False, False)
                 print('output', output.size())
                 print('label', proj_labels.size())
                 loss_m = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + self.ls(output, proj_labels.long())
@@ -682,7 +683,7 @@ class Trainer():
             # step scheduler
             scheduler.step()
 
-        return acc.avg, iou.avg, losses.avg, update_ratio_meter.avg,hetero_l.avg
+        return acc.avg, iou.avg, losses.avg, losses_aux.avg, losses_total.avg, update_ratio_meter.avg,hetero_l.avg
 
     def validate(self, val_loader, model, criterion, evaluator, class_func, color_fn, save_scans):
         losses = AverageMeter()
@@ -729,7 +730,7 @@ class Trainer():
                 #     wce = criterion(log_out, proj_labels)
                 #     loss = wce + jacc
                 else:
-                    output = model(in_vol)
+                    output = model(in_vol, False, False)
                     log_out = torch.log(output.clamp(min=1e-8))
                     jacc = self.ls(output, proj_labels)
                     wce = criterion(log_out, proj_labels)
