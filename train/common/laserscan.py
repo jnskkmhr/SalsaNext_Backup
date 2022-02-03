@@ -12,7 +12,7 @@ class LaserScan:
     """Class that contains LaserScan with x,y,z,r"""
     EXTENSIONS_SCAN = ['.bin']
 
-    def __init__(self, project=False, H=64, W=2048, fov_up=15.0, fov_down=-25.0, DA=False,flip_sign=False,rot=False,drop_points=False):
+    def __init__(self, project=False, H=64, W=2048, fov_up=10.0, fov_down=-18.0, DA=False,flip_sign=False,rot=False,drop_points=False):
         self.project = project
         self.proj_H = H
         self.proj_W = W
@@ -31,7 +31,7 @@ class LaserScan:
         self.img_aug = False
         self.reset()
         self.start = time.perf_counter()
-        self.unfold = True     #some bugs
+        self.unfold = False     #some bugs
         self.vls_noise = False  #provide noise with vls data
         if self.vls_noise:
             self.vls = []
@@ -431,7 +431,7 @@ class SemLaserScan(LaserScan):
     """Class that contains LaserScan with x,y,z,r,sem_label,sem_color_label,inst_label,inst_color_label"""
     EXTENSIONS_LABEL = ['.label']
 
-    def __init__(self, sem_color_dict=None, project=False, H=64, W=2048, fov_up=15.0, fov_down=-25.0, max_classes=300, DA=False,flip_sign=False,drop_points=False):
+    def __init__(self, sem_color_dict=None, project=False, H=64, W=2048, fov_up=10.0, fov_down=-18.0, max_classes=300, DA=False,flip_sign=False,drop_points=False):
         super(SemLaserScan, self).__init__(project, H, W, fov_up, fov_down)
         self.reset()
 
