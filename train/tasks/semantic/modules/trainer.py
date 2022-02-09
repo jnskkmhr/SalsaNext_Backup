@@ -5,13 +5,15 @@ import os
 import time
 import imp
 import copy 
-import random
+from random import randint 
+from itertools import cycle
 
 from torch import random
 import cv2
 import torch
 import torch.backends.cudnn as cudnn
 import torch.nn as nn
+from torch.utils.data import DataLoader, Dataset 
 
 import torch.optim as optim
 from matplotlib import pyplot as plt
@@ -26,6 +28,17 @@ from tasks.semantic.modules.SalsaNextAdf import *
 from tasks.semantic.modules.SalsaNextDA import * 
 from tasks.semantic.modules.Lovasz_Softmax import Lovasz_softmax
 import tasks.semantic.modules.adf as adf
+
+
+# class ConcatDataset(Dataset):
+#     def __init__(self, *datasets):
+#         self.datasets = datasets
+
+#     def __getitem__(self, i):
+#         return tuple(d[i] for d in self.datasets)
+
+#     def __len__(self):
+#         return min(len(d) for d in self.datasets)
 
 def keep_variance_fn(x):
     return x + 1e-3
@@ -66,7 +79,7 @@ def save_checkpoint(to_save, logdir, suffix=""):
 
 
 class Trainer():
-    def __init__(self, ARCH, DATA, datadir, logdir, testdir, path=None,uncertainty=False, DA=False):
+    def __init__(self, ARCH, DATA, datadir, logdir, testdir, path=None,uncertainty=False, DA=True):
         # parameters
         self.ARCH = ARCH
         self.DATA = DATA
@@ -114,20 +127,27 @@ class Trainer():
                                           shuffle_train=True)
 
         # ラベルがついていない、データセットを取ってきたい
-        self.parser_test = parserModule.Parser(root=self.testdir,
-                                               train_sequences=self.DATA["split"]["train"],
-                                               valid_sequences=self.DATA["split"]["valid"],
-                                               test_sequences=self.DATA["split"]["test"],
+        self.parser_test = parserModule.Parser(root="/home/acd13971vc/vls",
+                                               train_sequences=[1, 4],
+                                               valid_sequences=[4],
+                                               test_sequences=None,
                                                labels=self.DATA["labels"],
                                                color_map=self.DATA["color_map"],
                                                learning_map=self.DATA["learning_map"],
                                                learning_map_inv=self.DATA["learning_map_inv"],
                                                sensor=self.ARCH["dataset"]["sensor"],
                                                max_points=self.ARCH["dataset"]["max_points"],
-                                               batch_size=1,
+                                               batch_size=self.ARCH["train"]["batch_size_test"],
                                                workers=self.ARCH["train"]["workers"],
-                                               gt=True,
+                                               gt=False,
                                                shuffle_train=False)
+
+        # concat trainset and testset and transform it to dataloader 
+        # if self.DA: 
+        #     self.trainloader = DataLoader(
+        #                 ConcatDataset(self.parser.get_train_set(), self.parser_test.get_train_set()),
+        #                 batch_size=self.ARCH["train"]["batch_size"], shuffle=True,
+        #                 num_workers=self.ARCH["train"]["workers"], drop_last=True)
 
         # weights for loss (and bias)
 
@@ -144,13 +164,13 @@ class Trainer():
         print("Loss weights from content: ", self.loss_w.data)
 
         with torch.no_grad():
-            if not self.uncertainty:
+            if not self.uncertainty and not self.DA:
                 self.model = SalsaNext(self.parser.get_n_classes())
 
             elif self.DA: 
                 self.model = SalsaNextDA(self.parser.get_n_classes())
 
-            else:
+            elif self.uncertainty:
                 self.model = SalsaNextUncertainty(self.parser.get_n_classes())
 
         self.tb_logger = Logger(self.log + "/tb")
@@ -181,15 +201,13 @@ class Trainer():
         self.ls = Lovasz_softmax(ignore=0).to(self.device)
         self.SoftmaxHeteroscedasticLoss = SoftmaxHeteroscedasticLoss().to(self.device)
         # added auxilary loss 
-        if self.DA: 
-            self.AuxiliaryLoss = nn.MSELoss().to(self.device)
+        self.AuxiliaryLoss = nn.MSELoss().to(self.device)
         # loss as dataparallel too (more images in batch)
         if self.n_gpus > 1:
             self.criterion = nn.DataParallel(self.criterion).cuda()  # spread in gpus
             self.ls = nn.DataParallel(self.ls).cuda()
             self.SoftmaxHeteroscedasticLoss = nn.DataParallel(self.SoftmaxHeteroscedasticLoss).cuda()
-            if self.DA: 
-                self.AuxiliaryLoss = nn.DataParallel(self.AuxiliaryLoss).cuda()
+            self.AuxiliaryLoss = nn.DataParallel(self.AuxiliaryLoss).cuda()
         self.optimizer = optim.SGD([{'params': self.model.parameters()}],
                                    lr=self.ARCH["train"]["lr"],
                                    momentum=self.ARCH["train"]["momentum"],
@@ -287,31 +305,18 @@ class Trainer():
 
         # train for n epochs
         for epoch in range(self.epoch, self.ARCH["train"]["max_epochs"]):
-
             # train for 1 epoch
-            if self.DA: 
-                acc, iou, loss, update_mean,hetero_l = self.train_epoch_da(train_loader=self.parser.get_train_set(),
-                                                            test_loader=self.parser_test.get_train_set(), 
-                                                            model=self.model,
-                                                            criterion=self.criterion,
-                                                            optimizer=self.optimizer,
-                                                            epoch=epoch,
-                                                            evaluator=self.evaluator,
-                                                            scheduler=self.scheduler,
-                                                            color_fn=self.parser.to_color,
-                                                            report=self.ARCH["train"]["report_batch"],
-                                                            show_scans=self.ARCH["train"]["show_scans"])
-            else: 
-                acc, iou, loss, update_mean,hetero_l = self.train_epoch(train_loader=self.parser.get_train_set(), 
-                                                            model=self.model,
-                                                            criterion=self.criterion,
-                                                            optimizer=self.optimizer,
-                                                            epoch=epoch,
-                                                            evaluator=self.evaluator,
-                                                            scheduler=self.scheduler,
-                                                            color_fn=self.parser.to_color,
-                                                            report=self.ARCH["train"]["report_batch"],
-                                                            show_scans=self.ARCH["train"]["show_scans"])
+            acc, iou, loss, loss_2, loss_sum, update_mean,hetero_l = self.train_epoch(train_loader=self.parser.get_train_loader(), 
+                                                        target_loader=self.parser_test.get_train_loader(), 
+                                                        model=self.model,
+                                                        criterion=self.criterion,
+                                                        optimizer=self.optimizer,
+                                                        epoch=epoch,
+                                                        evaluator=self.evaluator,
+                                                        scheduler=self.scheduler,
+                                                        color_fn=self.parser.to_color,
+                                                        report=self.ARCH["train"]["report_batch"],
+                                                        show_scans=self.ARCH["train"]["show_scans"])
 
 
             # update info
@@ -320,6 +325,8 @@ class Trainer():
             self.info["train_acc"] = acc
             self.info["train_iou"] = iou
             self.info["train_hetero"] = hetero_l
+            self.info["train_loss_2"] = loss_2
+            self.info["train_loss_sum"] = loss_sum
 
             # remember best iou and save checkpoint
             state = {'epoch': epoch, 'state_dict': self.model.state_dict(),
@@ -328,6 +335,7 @@ class Trainer():
                      'scheduler': self.scheduler.state_dict()
                      }
             save_checkpoint(state, self.log, suffix="")
+            print("Saved checkpoint") #get a log when saving model 
 
             if self.info['train_iou'] > self.info['best_train_iou']:
                 print("Best mean iou in training set so far, save model!")
@@ -342,7 +350,7 @@ class Trainer():
             if epoch % self.ARCH["train"]["report_epoch"] == 0:
                 # evaluate on validation set
                 print("*" * 80)
-                acc, iou, loss, rand_img,hetero_l = self.validate(val_loader=self.parser.get_valid_set(),
+                acc, iou, loss, rand_img,hetero_l = self.validate(val_loader=self.parser.get_valid_loader(),
                                                          model=self.model,
                                                          criterion=self.criterion,
                                                          evaluator=self.evaluator,
@@ -386,52 +394,169 @@ class Trainer():
 
         return
 
-    def crop_target(self, x): 
+    def crop_target_image(self, x): 
         #assume x as a minibatch of test loader 
-        _, h, w, _ = x.size()
-        idx = [random.randint(0, 1) for _ in range(w)]
+        _, _, h, w = x.size()
+        idx = [randint(0, 1) for _ in range(w)]
         idx = [i for i, a in enumerate(idx) if a==1]
         x_aux = copy.deepcopy(x)
-        x_aux[:, :, idx, :] = 0 
+        x_aux[:, :, :, idx] = 0 
         return x-x_aux, x_aux 
 
-    def train_epoch(self, train_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10,
+    def crop_target_mask(self, x): 
+        #assume x as a minibatch of test loader 
+        _, h, w = x.size()
+        idx = [randint(0, 1) for _ in range(w)]
+        idx = [i for i, a in enumerate(idx) if a==1]
+        x_aux = copy.deepcopy(x)
+        x_aux[:, :, idx] = 0 
+        return x-x_aux, x_aux
+
+    def train_epoch(self, train_loader, target_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10,
                     show_scans=False):
+        ''' 1 epoch train loop for SalSaNext with unsupervised domain adaptation'''
         losses = AverageMeter()
+        losses_aux = AverageMeter()
+        losses_total = AverageMeter()
         acc = AverageMeter()
         iou = AverageMeter()
         hetero_l = AverageMeter()
         update_ratio_meter = AverageMeter()
+        beta = 1e-6 #scaler weight of L_aux 
 
         # empty the cache to train now
         if self.gpu:
             torch.cuda.empty_cache()
-
-        # switch to train mode
-        model.train()
-
+        
         end = time.time()
-        for i, (in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _) in enumerate(train_loader):
+        for i, (source_item, target_item) in enumerate(zip(train_loader, target_loader)):
+            print('batch iteration {}'.format(i))
+            in_vol, proj_mask, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _ = source_item 
+            in_vol_t, proj_mask_t, _, _, _, _, _, _, _, _, _, _, _, _, _ = target_item
+
             # measure data loading time
+            end = time.time()
             self.data_time_t.update(time.time() - end)
-            if not self.multi_gpu and self.gpu:
-                in_vol = in_vol.cuda()
-                #proj_mask = proj_mask.cuda()
+
+            ############# method1 ############
+            print("method 1")
+            model.train()
+            ## unfreeze UDA specific layer
+            # print('unfreeze UDA specific laye')
+            # for param in model.module.upBlock_aux1.parameters(): 
+            #     param.requires_grad = True 
+            # for param in model.module.upBlock_aux2.parameters(): 
+            #     param.requires_grad = True
+            # for param in model.module.upBlock_aux3.parameters(): 
+            #     param.requires_grad = True 
+            # for param in model.module.upBlock_aux4.parameters(): 
+            #     param.requires_grad = True
+            # for param in model.module.logits_aux.parameters(): 
+            #     param.requires_grad = True
+            # for block in [model.module.resBlock1, model.module.resBlock2, model.module.resBlock3, model.module.resBlock4, model.module.resBlock5]: 
+            #     block.ga1.conv1.weight.requires_grad = True
+            #     block.ga1.conv1.bias.requires_grad = True 
+            #     block.ga2.conv1.weight.requires_grad = True
+            #     block.ga2.conv1.bias.requires_grad = True
+            #     block.ga3.conv1.weight.requires_grad = True
+            #     block.ga3.conv1.bias.requires_grad = True
+            #     block.ga4.conv1.weight.requires_grad = True
+            #     block.ga4.conv1.bias.requires_grad = True
+
+            with torch.no_grad(): 
+                _, in_vol_t_aux = self.crop_target_image(in_vol_t)
+                _, proj_mask_t_aux = self.crop_target_mask(proj_mask_t)
+            
+                
+            reconst = model(in_vol_t_aux, True, True)
+            loss_aux = beta * self.AuxiliaryLoss(reconst, in_vol_t)
+
+            optimizer.zero_grad()
+            if self.n_gpus > 1:
+                idx = torch.ones(self.n_gpus).cuda()
+                loss_aux.backward(idx)
+            else:
+                loss_aux.backward()
+            optimizer.step()
+
+            #record loss
+            loss_2 = loss_aux.mean()
+            losses_aux.update(loss_2.item(), in_vol_t.size(0))
+            
+            # empty the cache to train now
             if self.gpu:
+                torch.cuda.empty_cache()
+            
+            ################# method2 #####################
+            print("method 2")
+            #mask_inv_s : [B, W, H]
+            #in_vol, comp_s : [B, C, W, H]
+            model.eval()
+
+            ## freeze UDA specific layer
+            # print('freeze UDA specific layer')
+            # for param in model.module.upBlock_aux1.parameters(): 
+            #     param.requires_grad = False 
+            # for param in model.module.upBlock_aux2.parameters(): 
+            #     param.requires_grad = False
+            # for param in model.module.upBlock_aux3.parameters(): 
+            #     param.requires_grad = False 
+            # for param in model.module.upBlock_aux4.parameters(): 
+            #     param.requires_grad = False
+            # for param in model.module.logits_aux.parameters(): 
+            #     param.requires_grad = False
+            # for block in [model.module.resBlock1, model.module.resBlock2, model.module.resBlock3, model.module.resBlock4, model.module.resBlock5]: 
+            #     block.ga1.conv1.weight.requires_grad = False
+            #     block.ga1.conv1.bias.requires_grad = False 
+            #     block.ga2.conv1.weight.requires_grad = False
+            #     block.ga2.conv1.bias.requires_grad = False
+            #     block.ga3.conv1.weight.requires_grad = False
+            #     block.ga3.conv1.bias.requires_grad = False
+            #     block.ga4.conv1.weight.requires_grad = False
+            #     block.ga4.conv1.bias.requires_grad = False
+
+            comp_s = model(in_vol, True, True)
+            comp_s = comp_s.cpu()
+            masks_inv_s = 1 - proj_mask
+            in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3) #swap batch and channel dim
+            in_vol[:, masks_inv_s==1] = comp_s[:, masks_inv_s==1] 
+            in_vol, comp_s = in_vol.permute(1, 0, 2, 3), comp_s.permute(1, 0, 2, 3)
+            
+            #mask transfer from target to source 
+            proj_mask_t = proj_mask_t + proj_mask_t_aux
+            proj_mask = proj_mask * proj_mask_t
+            proj_labels = proj_labels * proj_mask
+            in_vol = in_vol * proj_mask_t.float().unsqueeze(1)
+
+            # empty the cache to train now
+            if self.gpu:
+                torch.cuda.empty_cache()
+
+            ################### method3 ######################
+            print("method 3")
+            model.train()
+
+            if not self.multi_gpu and self.gpu: 
+                in_vol = in_vol.cuda()
+
+            if self.gpu: 
                 proj_labels = proj_labels.cuda().long()
 
             # compute output
             if self.uncertainty:
                 output = model(in_vol)
-                output_mean, output_var = adf.Softmax(dim=1, keep_variance_fn=keep_variance_fn)(*output)
+                output_mean, _ = adf.Softmax(dim=1, keep_variance_fn=keep_variance_fn)(*output)
                 hetero = self.SoftmaxHeteroscedasticLoss(output,proj_labels)
                 loss_m = criterion(output_mean.clamp(min=1e-8), proj_labels) + hetero + self.ls(output_mean, proj_labels.long())
 
                 hetero_l.update(hetero.mean().item(), in_vol.size(0))
                 output = output_mean
             else:
-                output = model(in_vol)
+                output = model(in_vol, False, False)
+                print('output', output.size())
+                print('label', proj_labels.size())
                 loss_m = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + self.ls(output, proj_labels.long())
+                # loss_m = self.ls(output, proj_labels.long())
 
             optimizer.zero_grad()
             if self.n_gpus > 1:
@@ -443,6 +568,7 @@ class Trainer():
 
             # measure accuracy and record loss
             loss = loss_m.mean()
+            loss_total = loss + loss_2
             with torch.no_grad():
                 evaluator.reset()
                 argmax = output.argmax(dim=1)
@@ -451,6 +577,7 @@ class Trainer():
                 jaccard, class_jaccard = evaluator.getIoU()
 
             losses.update(loss.item(), in_vol.size(0))
+            losses_total.update(loss_total.item(), in_vol.size(0))
             acc.update(accuracy.item(), in_vol.size(0))
             iou.update(jaccard.item(), in_vol.size(0))
 
@@ -495,245 +622,68 @@ class Trainer():
 
                 if i % self.ARCH["train"]["report_batch"] == 0:
                     print( 'Lr: {lr:.3e} | '
-                          'Update: {umean:.3e} mean,{ustd:.3e} std | '
-                          'Epoch: [{0}][{1}/{2}] | '
-                          'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
-                          'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
-                          'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
-                          'Hetero {hetero_l.val:.4f} ({hetero_l.avg:.4f}) | '
-                          'acc {acc.val:.3f} ({acc.avg:.3f}) | '
-                          'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
+                        'Update: {umean:.3e} mean,{ustd:.3e} std | '
+                        'Epoch: [{0}][{1}/{2}] | '
+                        'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
+                        'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
+                        'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
+                        'Loss_aux {loss_2.val:.4f} ({loss_2.avg:.4f}) | '
+                        'Loss_total {loss_total.val:.4f} ({loss_total.avg:.4f}) | '
+                        'Hetero {hetero_l.val:.4f} ({hetero_l.avg:.4f}) | '
+                        'acc {acc.val:.3f} ({acc.avg:.3f}) | '
+                        'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
                         epoch, i, len(train_loader), batch_time=self.batch_time_t,
-                        data_time=self.data_time_t, loss=losses, hetero_l=hetero_l,acc=acc, iou=iou, lr=lr,
+                        data_time=self.data_time_t, loss=losses, loss_aux=losses_aux, loss_total=losses_total, hetero_l=hetero_l,acc=acc, iou=iou, lr=lr,
                         umean=update_mean, ustd=update_std, estim=self.calculate_estimate(epoch, i)))
 
                     save_to_log(self.log, 'log.txt', 'Lr: {lr:.3e} | '
-                          'Update: {umean:.3e} mean,{ustd:.3e} std | '
-                          'Epoch: [{0}][{1}/{2}] | '
-                          'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
-                          'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
-                          'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
-                          'Hetero {hetero.val:.4f} ({hetero.avg:.4f}) | '
-                          'acc {acc.val:.3f} ({acc.avg:.3f}) | '
-                          'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
+                        'Update: {umean:.3e} mean,{ustd:.3e} std | '
+                        'Epoch: [{0}][{1}/{2}] | '
+                        'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
+                        'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
+                        'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
+                        'Loss_aux {loss_2.val:.4f} ({loss_2.avg:.4f}) | '
+                        'Loss_total {loss_total.val:.4f} ({loss_total.avg:.4f}) | '
+                        'Hetero {hetero.val:.4f} ({hetero.avg:.4f}) | '
+                        'acc {acc.val:.3f} ({acc.avg:.3f}) | '
+                        'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
                         epoch, i, len(train_loader), batch_time=self.batch_time_t,
-                        data_time=self.data_time_t, loss=losses, hetero=hetero_l,acc=acc, iou=iou, lr=lr,
+                        data_time=self.data_time_t, loss=losses, loss_2=losses_aux, loss_total=losses_total, hetero=hetero_l,acc=acc, iou=iou, lr=lr,
                         umean=update_mean, ustd=update_std, estim=self.calculate_estimate(epoch, i)))
             else:
                 if i % self.ARCH["train"]["report_batch"] == 0:
                     print('Lr: {lr:.3e} | '
-                          'Update: {umean:.3e} mean,{ustd:.3e} std | '
-                          'Epoch: [{0}][{1}/{2}] | '
-                          'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
-                          'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
-                          'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
-                          'acc {acc.val:.3f} ({acc.avg:.3f}) | '
-                          'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
+                        'Update: {umean:.3e} mean,{ustd:.3e} std | '
+                        'Epoch: [{0}][{1}/{2}] | '
+                        'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
+                        'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
+                        'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
+                        'Loss_aux {loss_2.val:.4f} ({loss_2.avg:.4f}) | '
+                        'Loss_total {loss_total.val:.4f} ({loss_total.avg:.4f}) | '
+                        'acc {acc.val:.3f} ({acc.avg:.3f}) | '
+                        'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
                         epoch, i, len(train_loader), batch_time=self.batch_time_t,
-                        data_time=self.data_time_t, loss=losses, acc=acc, iou=iou, lr=lr,
+                        data_time=self.data_time_t, loss=losses, loss_2=losses_aux, loss_total=losses_total, acc=acc, iou=iou, lr=lr,
                         umean=update_mean, ustd=update_std, estim=self.calculate_estimate(epoch, i)))
 
                     save_to_log(self.log, 'log.txt', 'Lr: {lr:.3e} | '
-                                                     'Update: {umean:.3e} mean,{ustd:.3e} std | '
-                                                     'Epoch: [{0}][{1}/{2}] | '
-                                                     'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
-                                                     'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
-                                                     'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
-                                                     'acc {acc.val:.3f} ({acc.avg:.3f}) | '
-                                                     'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
+                                                    'Update: {umean:.3e} mean,{ustd:.3e} std | '
+                                                    'Epoch: [{0}][{1}/{2}] | '
+                                                    'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
+                                                    'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
+                                                    'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
+                                                    'Loss_aux {loss_2.val:.4f} ({loss_2.avg:.4f}) | '
+                                                    'Loss_total {loss_total.val:.4f} ({loss_total.avg:.4f}) | '
+                                                    'acc {acc.val:.3f} ({acc.avg:.3f}) | '
+                                                    'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
                         epoch, i, len(train_loader), batch_time=self.batch_time_t,
-                        data_time=self.data_time_t, loss=losses, acc=acc, iou=iou, lr=lr,
+                        data_time=self.data_time_t, loss=losses, loss_2=losses_aux, loss_total=losses_total, acc=acc, iou=iou, lr=lr,
                         umean=update_mean, ustd=update_std, estim=self.calculate_estimate(epoch, i)))
 
             # step scheduler
             scheduler.step()
 
-        return acc.avg, iou.avg, losses.avg, update_ratio_meter.avg,hetero_l.avg
-
-    def train_epoch_da(self, train_loader, test_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10,
-                    show_scans=False):
-        ''' 1 epoch train loop for SalSaNext with unsupervised domain adaptation'''
-        losses = AverageMeter()
-        acc = AverageMeter()
-        iou = AverageMeter()
-        hetero_l = AverageMeter()
-        update_ratio_meter = AverageMeter()
-        beta = 1e-6 #scaler weight of L_aux 
-
-        # empty the cache to train now
-        if self.gpu:
-            torch.cuda.empty_cache()
-        
-        for i, ((in_vol, proj_in), (proj_mask, proj_mask_t), (proj_labels, _), (_, _), (path_seq, _), (path_name, _), (_, p_x), (_, p_y), (_, p_z), (_, proj_range), (_, unprojrange), (_, _), (_, _), (_, _), (_, npoints)) in enumerate(zip(train_loader, test_loader)):
-
-            # unsupervised learning (method1)
-            model.DA = True
-            proj_in, image_aux = self.crop_target(proj_in)
-            proj_mask_t, mask_aux = self.crop_target(proj_mask_t)
-            _, reconst = model(image_aux)
-            loss_m = beta * self.AuxiliaryLoss(proj_in, reconst)
-
-            optimizer.zero_grad()
-            if self.n_gpus > 1:
-                idx = torch.ones(self.n_gpus).cuda()
-                loss_m.backward(idx)
-            else:
-                loss_m.backward()
-            optimizer.step()
- 
-        end = time.time()
-        # measure data loading time
-        self.data_time_t.update(time.time() - end)
-        if not self.multi_gpu and self.gpu:
-            in_vol = in_vol.cuda()
-            #proj_mask = proj_mask.cuda()
-        if self.gpu:
-            proj_labels = proj_labels.cuda().long()
-
-        # source image densification (method2) 
-        model.eval()
-        _, comp_s = model(in_vol)
-        masks_inv_s = 1 - proj_mask
-        in_vol[masks_inv_s] = comp_s[masks_inv_s]
-        
-        #mask transfer from target to source 
-        proj_mask_t = proj_mask_t + mask_aux
-        proj_mask = proj_mask * proj_mask_t
-        proj_labels = proj_labels * proj_mask
-        in_vol = in_vol * proj_mask_t 
-
-        # supervised learning (method3)
-        model.train()
-        model.DA = False
-        # compute output
-        if self.uncertainty:
-            output = model(in_vol)
-            output_mean, output_var = adf.Softmax(dim=1, keep_variance_fn=keep_variance_fn)(*output)
-            hetero = self.SoftmaxHeteroscedasticLoss(output,proj_labels)
-            loss_m = criterion(output_mean.clamp(min=1e-8), proj_labels) + hetero + self.ls(output_mean, proj_labels.long())
-
-            hetero_l.update(hetero.mean().item(), in_vol.size(0))
-            output = output_mean
-        else:
-            output = model(in_vol)
-            loss_m = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + self.ls(output, proj_labels.long())
-
-        optimizer.zero_grad()
-        if self.n_gpus > 1:
-            idx = torch.ones(self.n_gpus).cuda()
-            loss_m.backward(idx)
-        else:
-            loss_m.backward()
-        optimizer.step()
-
-        # measure accuracy and record loss
-        loss = loss_m.mean()
-        with torch.no_grad():
-            evaluator.reset()
-            argmax = output.argmax(dim=1)
-            evaluator.addBatch(argmax, proj_labels)
-            accuracy = evaluator.getacc()
-            jaccard, class_jaccard = evaluator.getIoU()
-
-        losses.update(loss.item(), in_vol.size(0))
-        acc.update(accuracy.item(), in_vol.size(0))
-        iou.update(jaccard.item(), in_vol.size(0))
-
-        # measure elapsed time
-        self.batch_time_t.update(time.time() - end)
-        end = time.time()
-
-        # get gradient updates and weights, so I can print the relationship of
-        # their norms
-        update_ratios = []
-        for g in self.optimizer.param_groups:
-            lr = g["lr"]
-            for value in g["params"]:
-                if value.grad is not None:
-                    w = np.linalg.norm(value.data.cpu().numpy().reshape((-1)))
-                    update = np.linalg.norm(-max(lr, 1e-10) *
-                                            value.grad.cpu().numpy().reshape((-1)))
-                    update_ratios.append(update / max(w, 1e-10))
-        update_ratios = np.array(update_ratios)
-        update_mean = update_ratios.mean()
-        update_std = update_ratios.std()
-        update_ratio_meter.update(update_mean)  # over the epoch
-
-        if show_scans:
-            # get the first scan in batch and project points
-            mask_np = proj_mask[0].cpu().numpy()
-            depth_np = in_vol[0][0].cpu().numpy()
-            pred_np = argmax[0].cpu().numpy()
-            gt_np = proj_labels[0].cpu().numpy()
-            out = Trainer.make_log_img(depth_np, mask_np, pred_np, gt_np, color_fn)
-
-            mask_np = proj_mask[1].cpu().numpy()
-            depth_np = in_vol[1][0].cpu().numpy()
-            pred_np = argmax[1].cpu().numpy()
-            gt_np = proj_labels[1].cpu().numpy()
-            out2 = Trainer.make_log_img(depth_np, mask_np, pred_np, gt_np, color_fn)
-
-            out = np.concatenate([out, out2], axis=0)
-            cv2.imshow("sample_training", out)
-            cv2.waitKey(1)
-        if self.uncertainty:
-
-            if i % self.ARCH["train"]["report_batch"] == 0:
-                print( 'Lr: {lr:.3e} | '
-                    'Update: {umean:.3e} mean,{ustd:.3e} std | '
-                    'Epoch: [{0}][{1}/{2}] | '
-                    'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
-                    'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
-                    'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
-                    'Hetero {hetero_l.val:.4f} ({hetero_l.avg:.4f}) | '
-                    'acc {acc.val:.3f} ({acc.avg:.3f}) | '
-                    'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
-                    epoch, i, len(train_loader), batch_time=self.batch_time_t,
-                    data_time=self.data_time_t, loss=losses, hetero_l=hetero_l,acc=acc, iou=iou, lr=lr,
-                    umean=update_mean, ustd=update_std, estim=self.calculate_estimate(epoch, i)))
-
-                save_to_log(self.log, 'log.txt', 'Lr: {lr:.3e} | '
-                    'Update: {umean:.3e} mean,{ustd:.3e} std | '
-                    'Epoch: [{0}][{1}/{2}] | '
-                    'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
-                    'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
-                    'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
-                    'Hetero {hetero.val:.4f} ({hetero.avg:.4f}) | '
-                    'acc {acc.val:.3f} ({acc.avg:.3f}) | '
-                    'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
-                    epoch, i, len(train_loader), batch_time=self.batch_time_t,
-                    data_time=self.data_time_t, loss=losses, hetero=hetero_l,acc=acc, iou=iou, lr=lr,
-                    umean=update_mean, ustd=update_std, estim=self.calculate_estimate(epoch, i)))
-        else:
-            if i % self.ARCH["train"]["report_batch"] == 0:
-                print('Lr: {lr:.3e} | '
-                    'Update: {umean:.3e} mean,{ustd:.3e} std | '
-                    'Epoch: [{0}][{1}/{2}] | '
-                    'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
-                    'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
-                    'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
-                    'acc {acc.val:.3f} ({acc.avg:.3f}) | '
-                    'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
-                    epoch, i, len(train_loader), batch_time=self.batch_time_t,
-                    data_time=self.data_time_t, loss=losses, acc=acc, iou=iou, lr=lr,
-                    umean=update_mean, ustd=update_std, estim=self.calculate_estimate(epoch, i)))
-
-                save_to_log(self.log, 'log.txt', 'Lr: {lr:.3e} | '
-                                                'Update: {umean:.3e} mean,{ustd:.3e} std | '
-                                                'Epoch: [{0}][{1}/{2}] | '
-                                                'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
-                                                'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
-                                                'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
-                                                'acc {acc.val:.3f} ({acc.avg:.3f}) | '
-                                                'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
-                    epoch, i, len(train_loader), batch_time=self.batch_time_t,
-                    data_time=self.data_time_t, loss=losses, acc=acc, iou=iou, lr=lr,
-                    umean=update_mean, ustd=update_std, estim=self.calculate_estimate(epoch, i)))
-
-        # step scheduler
-        scheduler.step()
-
-        return acc.avg, iou.avg, losses.avg, update_ratio_meter.avg,hetero_l.avg
+        return acc.avg, iou.avg, losses.avg, losses_aux.avg, losses_total.avg, update_ratio_meter.avg,hetero_l.avg
 
     def validate(self, val_loader, model, criterion, evaluator, class_func, color_fn, save_scans):
         losses = AverageMeter()
@@ -755,6 +705,7 @@ class Trainer():
         with torch.no_grad():
             end = time.time()
             for i, (in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _) in enumerate(val_loader):
+                print("batch iteration {}".format(i))
                 if not self.multi_gpu and self.gpu:
                     in_vol = in_vol.cuda()
                     proj_mask = proj_mask.cuda()
@@ -779,7 +730,7 @@ class Trainer():
                 #     wce = criterion(log_out, proj_labels)
                 #     loss = wce + jacc
                 else:
-                    output = model(in_vol)
+                    output = model(in_vol, False, False)
                     log_out = torch.log(output.clamp(min=1e-8))
                     jacc = self.ls(output, proj_labels)
                     wce = criterion(log_out, proj_labels)
@@ -887,3 +838,195 @@ class Trainer():
 
 
         return acc.avg, iou.avg, losses.avg, rand_imgs, hetero_l.avg
+
+
+
+
+
+
+
+
+#new one 
+def train_epoch(self, train_loader, target_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10,
+                    show_scans=False):
+        ''' 1 epoch train loop for SalSaNext with unsupervised domain adaptation'''
+        losses = AverageMeter()
+        losses_aux = AverageMeter()
+        losses_total = AverageMeter()
+        acc = AverageMeter()
+        iou = AverageMeter()
+        hetero_l = AverageMeter()
+        update_ratio_meter = AverageMeter()
+        beta = 1e-6 #scaler weight of L_aux 
+
+        # empty the cache to train now
+        if self.gpu:
+            torch.cuda.empty_cache()
+        
+        end = time.time()
+        for i, (source, target) in enumerate(zip(train_loader, target_loader)):
+            in_vol, proj_mask, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _ = source
+            in_vol_t, proj_mask_t, _, _, _, _, _, _, _, _, _, _, _, _, _, proj_a, mask_a = target
+            
+            ########## step1 ##########
+            model.train()
+
+            end = time.time()
+            #whether cuda or cpu
+            self.data_time_t.update(time.time() - end)
+            if not self.multi_gpu and self.gpu:
+                #print("in_vol is cuda")
+                in_vol_t = in_vol_t.cuda()
+            if self.gpu:
+                #print("proj_a is cuda")
+                proj_a = proj_a.cuda()
+                mask_a = mask_a.cuda().float()
+
+            #compute output
+            output = model(in_vol_t, GA=True, aux=True)
+            del in_vol_t #memory release 
+            mask_a = mask_a.unsqueeze(1)
+            #print(output.size(), mask_a.size())
+            output = output * mask_a  #補完したところだけを抽出
+            loss_m_2 = criterion_2(output, proj_a) #if loss is NaN use clamp
+            del output 
+            #beta * 
+
+            optimizer.zero_grad()
+            if self.n_gpus > 1:
+                idx = torch.ones(self.n_gpus).cuda()
+                loss_m_2.backward(idx)
+            else:
+                loss_m_2.backward()
+            optimizer.step()
+
+            #record loss
+            loss_2 = loss_m_2.mean()
+            del loss_m_2 
+            losses_2.update(loss_2.item(), in_vol_t.size(0))
+            
+            # empty the cache to train now
+            if self.gpu:
+                torch.cuda.empty_cache()
+
+            ########## step2 ##########
+            model.eval()
+
+            # measure data loading time
+            self.data_time_t.update(time.time() - end)
+            if not self.multi_gpu and self.gpu:
+                in_vol = in_vol.cuda()
+                #proj_mask = proj_mask.cuda()
+            if self.gpu:
+                #proj_labels = proj_labels.cuda().long()
+                proj_labels = proj_labels.cuda().float()  #maskをかけるため
+
+
+            #completion image in source data
+            comp_s = model(in_vol, GA=True, aux=True)
+            comp_s = comp_s.cpu()
+            proj_mask_inv = (1 - proj_mask).long()  #dropoutしているところが1となる
+            
+            #fill in the missing pixel 
+            in_vol = in_vol + comp_s * proj_mask_inv
+            del comp_s 
+
+            #CUDA setting
+            if self.gpu:
+                mask_a = mask_a.cuda().float()
+                proj_mask_t = proj_mask_t.cuda().float()
+                proj_mask = proj_mask.cuda().float()
+                in_vol = in_vol.cuda()
+
+            #dropout similar to target data
+            proj_mask_t = proj_mask_t.unsqueeze(1)
+            proj_mask = proj_mask.unsqueeze(1)
+
+            proj_mask_t = proj_mask_t + mask_a  #target dropout
+            del mask_a 
+            proj_mask = proj_mask * proj_mask_t  #source and target dropout 
+            proj_mask = proj_mask.squeeze(1)  #labels.size() is [batch, 64, 2048]
+            proj_labels = proj_labels * proj_mask  
+            del proj_mask 
+            proj_labels = proj_labels.long()  #ここで正しいdtypeに直す
+            in_vol = in_vol * proj_mask_t  #sourceのsparceは補完したのでtarget noiseだけ付与
+            del proj_mask_t  
+
+            # empty the cache to train now
+            if self.gpu:
+                torch.cuda.empty_cache()
+
+            ########## step3 ##########
+            # measure data loading time
+            if not self.multi_gpu and self.gpu:
+                in_vol = in_vol.cuda()
+            if self.gpu:
+                proj_labels = proj_labels.cuda().long()
+
+            model.train()
+
+ 		# compute output
+            if self.uncertainty:
+                output = model(in_vol)
+                output_mean, output_var = adf.Softmax(dim=1, keep_variance_fn=keep_variance_fn)(*output)
+                hetero = self.SoftmaxHeteroscedasticLoss(output,proj_labels)
+                loss_m = criterion(output_mean.clamp(min=1e-8), proj_labels) + hetero + self.ls(output_mean, proj_labels.long())
+
+                hetero_l.update(hetero.mean().item(), in_vol.size(0))
+                output = output_mean
+            else:
+                output = model(in_vol, GA=False, aux=False)
+                del in_vol 
+                loss_m = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + self.ls(output, proj_labels.long())
+
+            optimizer.zero_grad()
+            if self.n_gpus > 1:
+                idx = torch.ones(self.n_gpus).cuda()
+                loss_m.backward(idx)
+            else:
+                loss_m.backward()
+            optimizer.step()
+
+            # measure accuracy and record loss
+            loss = loss_m.mean()
+            with torch.no_grad():
+                evaluator.reset()
+                argmax = output.argmax(dim=1)
+                evaluator.addBatch(argmax, proj_labels)
+                accuracy = evaluator.getacc()
+                jaccard, class_jaccard = evaluator.getIoU()
+
+            losses.update(loss.item(), in_vol.size(0))
+            acc.update(accuracy.item(), in_vol.size(0))
+            iou.update(jaccard.item(), in_vol.size(0))
+            loss_sum = loss_2 + loss
+            losses_sum.update(loss_sum.item(), in_vol.size(0))
+
+
+
+
+
+
+
+
+
+def random_crop_makelabel(self, ran, xyz, remission, mask):
+    xyz_t = np.full((64, 2048, 3), -1, dtype=np.float32)
+    xyz_a = np.full((64, 2048, 3), -1, dtype=np.float32)
+    sample = np.array([1, 0]) #0 is dropout
+    prob = [0.5, 0.5] #dropout probability
+    index = np.random.choice(sample, size=(2048), p=prob)
+    index = np.expand_dims(index, 0)
+    index = index.repeat(64, 0)
+
+    ran_t = ran * index
+    for i in range(3):
+        xyz_t[:,:,i] = xyz[:,:,i] * index
+        xyz_a[:,:,i] = xyz[:,:,i] * (1-index)
+    remission_t = remission * index
+    mask_t = (mask * index).astype(np.int32)
+    ran_a = ran * (1-index)
+    remission_a = remission * (1-index)
+    mask_a = (mask * (1-index)).astype(np.int32)
+
+    return ran_t, xyz_t, remission_t, mask_t, ran_a, xyz_a, remission_a, mask_a,
